@@ -35,7 +35,7 @@ MODES = ("fit", "fill", "stretch")
 
 
 def apply(im: Image.Image, spec, canvas: tuple[int, int], rng=None) -> Image.Image:
-    if spec in (None, False):
+    if spec is None or spec is False:
         return im
     if isinstance(spec, (int, float)) and not isinstance(spec, bool):
         spec = {"scale": spec}

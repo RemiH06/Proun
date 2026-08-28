@@ -21,6 +21,12 @@ class SinCambio(unittest.TestCase):
         for vacio in (None, False):
             self.assertIs(resize.apply(original, vacio, LIENZO), original)
 
+    def test_cero_no_es_lo_mismo_que_vacio(self):
+        # `0 in (None, False)` es True en Python, así que el guardia de entrada
+        # tiene que comparar por identidad o un resize: 0 pasaría de largo.
+        with self.assertRaises(SpecError):
+            resize.apply(imagen(), 0, LIENZO)
+
     def test_destino_igual_al_actual(self):
         original = imagen(400, 200)
         self.assertIs(resize.apply(original, [400, 200], LIENZO), original)
