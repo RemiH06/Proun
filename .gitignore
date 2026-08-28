@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+steps.md
 
 # salida generada
 wallpapers/
