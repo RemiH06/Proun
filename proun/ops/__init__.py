@@ -1,5 +1,5 @@
 """Cada módulo es una modificación independiente y probable por separado."""
 
-from . import crop, resize
+from . import crop, mosaic, resize
 
-__all__ = ["crop", "resize"]
+__all__ = ["crop", "mosaic", "resize"]
