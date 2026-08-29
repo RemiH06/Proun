@@ -24,12 +24,16 @@ ANCHORS = {
 }
 
 
-def measure(value, reference: int, *, name: str = "medida", minimum: int = 1) -> int:
-    """Convierte un valor px/fracción a píxeles enteros contra `reference`."""
+def measure(value, reference: int, *, name: str = "medida", minimum: int | None = 1) -> int:
+    """Convierte un valor px/fracción a píxeles enteros contra `reference`.
+
+    `minimum=None` quita el piso, que es lo que necesitan las posiciones: una
+    capa puede empezar en coordenada negativa para sangrar por el borde.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise SpecError(f"{name} debe ser un número, llegó {value!r}")
     px = round(value * reference) if isinstance(value, float) else int(value)
-    if px < minimum:
+    if minimum is not None and px < minimum:
         raise SpecError(f"{name} quedó en {px} px, debe ser al menos {minimum}")
     return px
 
