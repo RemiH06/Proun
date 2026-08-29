@@ -17,7 +17,7 @@ from .errors import SpecError
 
 LAYER_KEYS = {
     "src", "crop", "resize", "mosaic", "rotate", "tones", "recolor", "color",
-    "opacity", "blend", "position", "anchor", "repeat",
+    "opacity", "blend", "position", "anchor", "repeat", "cover",
 }
 
 SPEC_KEYS = {
@@ -45,6 +45,7 @@ class Layer:
     blend: str = "normal"
     position: object = None
     anchor: str = "center"
+    cover: bool = False
 
 
 @dataclass(frozen=True)
@@ -286,6 +287,17 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
         if not isinstance(repeat, int) or isinstance(repeat, bool) or not 1 <= repeat <= 500:
             raise SpecError(f"repeat debe ser un entero entre 1 y 500, llegó {repeat!r}")
 
+        cover = merged.pop("cover", False)
+        if not isinstance(cover, bool):
+            raise SpecError(f"cover debe ser true o false, llegó {cover!r}")
+        if cover:
+            choca = {"resize", "position"} & set(merged)
+            if choca:
+                raise SpecError(
+                    f"una capa con cover se ajusta sola al lienzo, así que no admite "
+                    f"{sorted(choca)}"
+                )
+
         recolor = merged.pop("recolor", {})
         if not isinstance(recolor, dict):
             raise SpecError(f"recolor debe ser un objeto, llegó {recolor!r}")
@@ -309,5 +321,6 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
                     blend=str(merged.get("blend", "normal")),
                     position=merged.get("position"),
                     anchor=merged.get("anchor", "center"),
+                    cover=cover,
                 ))
     return tuple(layers)

@@ -181,6 +181,60 @@ class Preparacion(unittest.TestCase):
         self.assertGreater(max(capa.size), 100)
 
 
+class CapaDeFondo(unittest.TestCase):
+    def fondo(self, **extra):
+        return spec.build({
+            "sources": [{"src": str(FUENTES / "b.png"), "cover": True},
+                        str(FUENTES / "a.png"), str(FUENTES / "c.png")],
+            "resolutions": ["400x300"], "colors": [AZUL], "seeds": [3],
+            "background": None, **extra,
+        })
+
+    def test_cubre_el_lienzo_exacto(self):
+        base = self.fondo()
+        for resolucion in ((400, 300), (300, 400), (1000, 200)):
+            shaped = compose.prepare(base, compose.plan(base, 3), resolucion)
+            self.assertEqual(shaped[0].tonal.size, resolucion, resolucion)
+
+    def test_no_deja_esquinas_transparentes(self):
+        base = self.fondo()
+        salida = compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        for esquina in ((0, 0), (399, 0), (0, 299), (399, 299)):
+            self.assertEqual(salida.getpixel(esquina)[3], 255, esquina)
+
+    def test_va_siempre_primera(self):
+        base = self.fondo()
+        for semilla in range(10):
+            plan = compose.plan(base, semilla)
+            self.assertTrue(plan.placements[0].layer.cover, semilla)
+            self.assertFalse(any(p.layer.cover for p in plan.placements[1:]), semilla)
+
+    def test_no_la_recorta_el_limite_de_capas(self):
+        base = self.fondo(layers=1)
+        plan = compose.plan(base, 3)
+        self.assertEqual(len(plan.placements), 2)
+        self.assertTrue(plan.placements[0].layer.cover)
+
+    def test_cubre_incluso_girada(self):
+        # El ajuste al lienzo va después del giro; si fuera antes, un cuarto de
+        # vuelta dejaría el fondo sin cubrir.
+        base = spec.build({
+            "sources": [{"src": str(FUENTES / "b.png"), "cover": True, "rotate": 90}],
+            "resolutions": ["400x300"], "colors": [AZUL], "seeds": [1], "background": None,
+        })
+        shaped = compose.prepare(base, compose.plan(base, 1), (400, 300))
+        self.assertEqual(shaped[0].tonal.size, (400, 300))
+
+    def test_varias_capas_de_fondo_conservan_su_orden(self):
+        base = spec.build({
+            "sources": [{"src": str(FUENTES / "b.png"), "cover": True},
+                        {"src": str(FUENTES / "c.png"), "cover": True}],
+            "resolutions": ["400x300"], "colors": [AZUL], "seeds": [1],
+        })
+        nombres = [p.layer.src.name for p in compose.plan(base, 1).placements]
+        self.assertEqual(nombres, ["b.png", "c.png"])
+
+
 class Errores(unittest.TestCase):
     def test_dice_que_imagen_fallo(self):
         base = spec.build({

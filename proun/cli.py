@@ -58,9 +58,17 @@ def parse_args(argv=None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def to_data(args: argparse.Namespace) -> dict:
-    """Fusiona el archivo de especificación con las banderas."""
-    data = spec_module.load(args.spec) if args.spec else {}
+def to_data(args: argparse.Namespace, config: dict | None = None) -> dict:
+    """Fusiona la configuración de código, el archivo y las banderas.
+
+    Precedencia de menor a mayor: el diccionario que venga de `main.py`, luego
+    lo que declare `--spec`, y al final las banderas de la línea de comandos.
+    """
+    if config is not None and not isinstance(config, dict):
+        raise SpecError(f"la configuración debe ser un diccionario, llegó {config!r}")
+    data = dict(config or {})
+    if args.spec:
+        data.update(spec_module.load(args.spec))
 
     if args.images:
         data["sources"] = list(args.images)
@@ -145,10 +153,10 @@ def run(config: spec_module.Spec, *, overwrite=False, dry_run=False, quiet=False
     return written
 
 
-def main(argv=None) -> int:
+def main(argv=None, config: dict | None = None) -> int:
     args = parse_args(argv)
     try:
-        config = spec_module.build(to_data(args))
+        config = spec_module.build(to_data(args, config))
         if not args.quiet:
             print(
                 f"{len(config.sources)} imágenes, {len(config.seeds)} composiciones, "

@@ -1,8 +1,8 @@
-"""Cada módulo es una modificación independiente y probable por separado."""
+"""Operaciones sobre una capa. Cada módulo es independiente y se prueba solo.
 
-from . import background, blend, crop, finish, mosaic, recolor, resize, rotate, tones
-
-__all__ = [
-    "background", "blend", "crop", "finish", "mosaic",
-    "recolor", "resize", "rotate", "tones",
-]
+A propósito no se importa nada aquí: `from proun.ops import crop` funciona sin
+declararlo, y hacerlo obligaría a cargar Pillow y los nueve módulos aunque solo
+se necesite uno. Además, un archivo faltante fallaba con un error que culpaba a
+un import circular inexistente, porque Python agrega esa nota cuando el fallo
+ocurre mientras el paquete se está inicializando.
+"""

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from PIL import Image, ImageEnhance, ImageFilter
 
-from ... import colors
+from .. import colors
 from ..errors import SpecError
 from .blend import composite
 

@@ -38,19 +38,29 @@ class Plan:
 
 
 def plan(spec: Spec, seed: int) -> Plan:
+    """Sortea la composición. Depende solo de la semilla.
+
+    Las capas con `cover` van primero y siempre entran: son el fondo, no
+    participan del sorteo de cuántas capas hay ni del acomodo, y su orden es el
+    declarado para que se puedan apilar de forma predecible.
+    """
     rng = random.Random(seed)
-    chosen = _pick(list(spec.sources), spec.layers, rng)
-    rng.shuffle(chosen)
-    turns = [rotate.decide(layer.rotate, rng) for layer in chosen]
-    centers = layout.positions(len(chosen), rng, spec.layout)
-    fills = layout.sizes(len(chosen), rng, spec.layout)
-    return Plan(
-        seed=seed,
-        placements=tuple(
-            Placement(layer=layer, angle=angle, flip=flip, center=center, fill=fill)
-            for layer, (angle, flip), center, fill in zip(chosen, turns, centers, fills)
-        ),
-    )
+    covers = [layer for layer in spec.sources if layer.cover]
+    resto = _pick([layer for layer in spec.sources if not layer.cover], spec.layers, rng)
+    rng.shuffle(resto)
+
+    placements = [
+        Placement(layer=layer, angle=angle, flip=flip, center=(0.5, 0.5), fill=1.0)
+        for layer, (angle, flip) in zip(covers, [rotate.decide(c.rotate, rng) for c in covers])
+    ]
+    turns = [rotate.decide(layer.rotate, rng) for layer in resto]
+    centers = layout.positions(len(resto), rng, spec.layout)
+    fills = layout.sizes(len(resto), rng, spec.layout)
+    placements += [
+        Placement(layer=layer, angle=angle, flip=flip, center=center, fill=fill)
+        for layer, (angle, flip), center, fill in zip(resto, turns, centers, fills)
+    ]
+    return Plan(seed=seed, placements=tuple(placements))
 
 
 @dataclass(frozen=True)
@@ -70,7 +80,8 @@ def prepare(spec: Spec, current: Plan, resolution: tuple[int, int]) -> tuple[Sha
     measure_canvas = spec.reference if spec.scale_with_resolution else resolution
     scale = _scale(spec, resolution)
     return tuple(
-        _shape_layer(placement, measure_canvas, scale) for placement in current.placements
+        _shape_layer(placement, measure_canvas, scale, resolution)
+        for placement in current.placements
     )
 
 
@@ -87,7 +98,9 @@ def render(spec: Spec, current: Plan, resolution: tuple[int, int], main,
             tile = recolor.apply(base.tonal, layer.color or main, layer.recolor, base.source)
         except Exception as exc:
             raise SourceError(f"falló el recoloreado de {layer.src.name}: {exc}") from exc
-        if placement.layer.position is not None:
+        if layer.cover:
+            position = (0, 0)
+        elif placement.layer.position is not None:
             position = layout.explicit(
                 placement.layer.position, tile.size, resolution, placement.layer.anchor
             )
@@ -115,21 +128,29 @@ def save(image: Image.Image, path: Path, fmt: str = "png", quality: int = 92,
     return path
 
 
-def _shape_layer(placement: Placement, measure_canvas, scale: float) -> "Shaped":
+def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution) -> "Shaped":
     layer = placement.layer
     try:
         im = loading.load(layer.src)
         im = crop.apply(im, layer.crop)
-        auto = layer.resize is None and layer.mosaic is None
-        fallback = {"size": [placement.fill, placement.fill], "mode": "fit"}
-        im = resize.apply(im, fallback if auto else layer.resize, measure_canvas)
-        im = mosaic.apply(im, layer.mosaic, measure_canvas)
-        im = rotate.apply(im, placement.angle, placement.flip)
-        if scale != 1.0:
-            im = im.resize(
-                (max(1, round(im.width * scale)), max(1, round(im.height * scale))),
-                Image.Resampling.LANCZOS,
-            )
+        if layer.cover:
+            # El ajuste al lienzo va al final, después de girar: si se hiciera
+            # antes, un cuarto de vuelta dejaría el fondo sin cubrir.
+            im = mosaic.apply(im, layer.mosaic, resolution)
+            im = rotate.apply(im, placement.angle, placement.flip)
+            im = resize.apply(im, {"size": list(resolution), "mode": "fill",
+                                   "anchor": layer.anchor}, resolution)
+        else:
+            auto = layer.resize is None and layer.mosaic is None
+            fallback = {"size": [placement.fill, placement.fill], "mode": "fit"}
+            im = resize.apply(im, fallback if auto else layer.resize, measure_canvas)
+            im = mosaic.apply(im, layer.mosaic, measure_canvas)
+            im = rotate.apply(im, placement.angle, placement.flip)
+            if scale != 1.0:
+                im = im.resize(
+                    (max(1, round(im.width * scale)), max(1, round(im.height * scale))),
+                    Image.Resampling.LANCZOS,
+                )
         tonal = tones.apply(im, layer.tones)
         keep = str(layer.recolor.get("mix_with", "tones")).lower() == "source"
         return Shaped(tonal=tonal, source=im if keep else None)

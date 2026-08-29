@@ -175,6 +175,32 @@ class Fuentes(unittest.TestCase):
                 spec.build(base(sources=[{"src": str(FUENTES / "a.png"), **extra}]))
 
 
+class Cover(unittest.TestCase):
+    def test_marca_la_capa(self):
+        config = spec.build(base(sources=[{"src": str(FUENTES / "a.png"), "cover": True}]))
+        self.assertTrue(config.sources[0].cover)
+
+    def test_por_defecto_es_falso(self):
+        self.assertFalse(spec.build(base()).sources[0].cover)
+
+    def test_choca_con_resize_y_position(self):
+        for extra in ({"resize": 2}, {"position": [0, 0]}):
+            with self.assertRaises(SpecError, msg=extra):
+                spec.build(base(sources=[{"src": str(FUENTES / "a.png"),
+                                          "cover": True, **extra}]))
+
+    def test_convive_con_crop_mosaico_y_giro(self):
+        config = spec.build(base(sources=[{
+            "src": str(FUENTES / "a.png"), "cover": True,
+            "crop": {"aspect": "16:9"}, "mosaic": 2, "rotate": 90,
+        }]))
+        self.assertTrue(config.sources[0].cover)
+
+    def test_tipo_invalido(self):
+        with self.assertRaises(SpecError):
+            spec.build(base(sources=[{"src": str(FUENTES / "a.png"), "cover": "si"}]))
+
+
 class Defaults(unittest.TestCase):
     def test_se_aplican_a_todas(self):
         config = spec.build(base(defaults={"rotate": "random", "blend": "screen"},

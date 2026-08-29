@@ -171,6 +171,37 @@ class Fusion(unittest.TestCase):
         self.assertEqual(cli._layers("3-8"), {"min": 3, "max": 8})
 
 
+class Configuracion(unittest.TestCase):
+    def test_desde_codigo(self):
+        destino = Path(tempfile.mkdtemp(dir=RAIZ))
+        config = {"sources": [str(FUENTES)], "resolutions": ["200x150"],
+                  "output": str(destino), "colors": ["#ff0000"], "seed": 1}
+        self.assertEqual(cli.main(["--quiet"], config=config), 0)
+        self.assertEqual(len(generados(destino)), 1)
+        self.assertIn("ff0000", generados(destino)[0])
+
+    def test_las_banderas_pisan_a_la_configuracion(self):
+        destino = Path(tempfile.mkdtemp(dir=RAIZ))
+        config = {"sources": [str(FUENTES)], "resolutions": ["800x600"],
+                  "output": str(destino), "colors": ["#ff0000"]}
+        cli.main(["--quiet", "--resolutions", "200x150", "--colors", "00ff00"], config=config)
+        self.assertTrue(generados(destino)[0].startswith("200x150/"))
+        self.assertIn("00ff00", generados(destino)[0])
+
+    def test_el_archivo_pisa_a_la_configuracion(self):
+        destino = Path(tempfile.mkdtemp(dir=RAIZ))
+        archivo = RAIZ / "encima.json"
+        archivo.write_text(json.dumps({"resolutions": ["200x150"]}), encoding="utf-8")
+        config = {"sources": [str(FUENTES)], "resolutions": ["800x600"],
+                  "output": str(destino)}
+        cli.main(["--quiet", "--spec", str(archivo)], config=config)
+        self.assertTrue(generados(destino)[0].startswith("200x150/"))
+
+    def test_configuracion_de_otro_tipo(self):
+        with redirect_stderr(io.StringIO()):
+            self.assertEqual(cli.main(["--quiet"], config=["fuentes"]), 2)
+
+
 class Errores(unittest.TestCase):
     def silencioso(self, argv):
         error = io.StringIO()
