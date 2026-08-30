@@ -133,6 +133,20 @@ class Modos(unittest.TestCase):
         blend.composite(base, capa((128, 128, 128)), (0, 0), mode="MULTIPLY")
         self.assertAlmostEqual(base.getpixel((10, 10))[0], 100, delta=2)
 
+    def test_los_modos_no_pintan_sobre_lo_transparente(self):
+        # El RGB de un pixel vacío es negro, así que un multiply sobre zona
+        # transparente pintaría de negro. Ahí debe usarse la capa tal cual.
+        vacio = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+        blend.composite(vacio, capa((255, 255, 255)), (0, 0), mode="multiply")
+        self.assertEqual(vacio.getpixel((10, 10))[:3], (255, 255, 255))
+
+    def test_fusiona_donde_el_fondo_es_opaco(self):
+        mitad = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+        mitad.paste((200, 200, 200, 255), (0, 0, 50, 100))
+        blend.composite(mitad, capa((128, 128, 128), 100, 100), (0, 0), mode="multiply")
+        self.assertAlmostEqual(mitad.getpixel((10, 10))[0], 100, delta=2)
+        self.assertEqual(mitad.getpixel((80, 10))[:3], (128, 128, 128))
+
     def test_modo_invalido(self):
         with self.assertRaises(SpecError):
             blend.composite(lienzo(), capa(), (0, 0), mode="disolver")

@@ -65,8 +65,13 @@ def composite(
         layer.putalpha(layer.getchannel("A").point(lambda v: round(v * opacity)))
 
     if mode != "normal":
-        base = canvas.crop((left, top, right, bottom)).convert("RGB")
-        fused = MODES[mode](base, layer.convert("RGB")).convert("RGBA")
+        base = canvas.crop((left, top, right, bottom))
+        color = layer.convert("RGB")
+        mezclado = MODES[mode](base.convert("RGB"), color)
+        # Donde el lienzo todavía está vacío no hay nada con qué fusionar, y su
+        # RGB es negro: sin esto, un multiply sobre zona transparente pintaría
+        # todo de negro. Se usa la fusión solo donde el fondo es opaco.
+        fused = Image.composite(mezclado, color, base.getchannel("A")).convert("RGBA")
         fused.putalpha(layer.getchannel("A"))
         layer = fused
 
