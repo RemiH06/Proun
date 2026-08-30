@@ -21,42 +21,16 @@ CONFIG = {
     # Rutas, directorios o globs. Una entrada puede ser texto o un objeto con
     # ajustes propios; lo que ponga la capa gana sobre "defaults".
     "sources": [
-        # a: fondo, se ajusta al lienzo entero y va detrás de todo
-        {
-            "src": "fuentes/umifu.tif",
-            "cover": True,
-            "opacity": 0.35,
-            "rotate": None,          # no gira, aunque el default diga random
-        },
-
-        # b: recorte 16:9 desde arriba, media pantalla, sin normalizar tonos
-        {
-            "src": "fuentes/Milkshake.jpg",
-            "crop": {"aspect": "16:9", "anchor": "top"},
-            "resize": {"size": [0.5, 0.5], "mode": "fill"},
-            "tones": False,
-            "recolor": {"mode": "tint"},
-            "blend": "screen",
-        },
-
-        # c: textura chica repetida en tira, en su propio color, entra dos veces
-        {
-            "src": "fuentes/dresscat.png",
-            "mosaic": {"grid": [5, 1], "mirror": True},
-            "color": "#ffb347",
-            "rotate": [0, 90],
-            "opacity": 0.8,
-            "repeat": 2,
-        },
+        "fuentes/",
     ],
 
     # --- qué se genera ----------------------------------------------------
     "output": "wallpapers",
     "resolutions": ["1920x1080", "2560x1440"],
-    "colors": ["#ffffff"],
+    "colors": ["#3ba7ff"],
     # "spectrum": {"count": 6, "saturation": 0.62, "value": 0.9},
-    "count": 8,
-    "seed": 69,            # fija el lote completo; quítalo para que sea al azar
+    "count": 4,
+    "seed": 2026,            # fija el lote completo; quítalo para que sea al azar
     # "seeds": [128004006],  # regenera exactamente estos wallpapers
     # "start_index": 1,
 
@@ -67,7 +41,7 @@ CONFIG = {
         "bleed": 0.12,           # cuánto pueden salirse del borde
         "size": [0.38, 0.82],    # fracción del lienzo por capa sin resize propio
     },
-    "background": "#ffffff",        # "auto", None, un color, o {"gradient": [...]}
+    "background": "auto",        # "auto", None, un color, o {"gradient": [...]}
     # "finish": {"vignette": 0.3, "grain": 0.05, "contrast": 1.05},
 
     # --- ajustes que heredan todas las capas -------------------------------
@@ -102,7 +76,8 @@ CONFIG = {
 #     "blend": "multiply",
 #     "position": [0.5, 0.5],
 #     "anchor": "center",
-#     "repeat": 2,         # cuántas veces entra esta imagen al collage
+#     "repeat": {"step": [0.5, 0], "times": 2, "mirror": True},
+#     "copies": 2,         # cuántas veces entra esta imagen al collage
 # }
 
 

@@ -18,7 +18,8 @@ from PIL import Image
 
 from . import colors, layout, loading
 from .errors import SourceError
-from .ops import background, blend, crop, finish, mosaic, recolor, resize, rotate, tones
+from .ops import (background, blend, crop, finish, mosaic, recolor, repeat, resize,
+                  rotate, tones)
 from .spec import Layer, Spec
 
 
@@ -137,6 +138,7 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution)
             # El ajuste al lienzo va al final, después de girar: si se hiciera
             # antes, un cuarto de vuelta dejaría el fondo sin cubrir.
             im = mosaic.apply(im, layer.mosaic, resolution)
+            im = repeat.apply(im, layer.repeat)
             im = rotate.apply(im, placement.angle, placement.flip)
             im = resize.apply(im, {"size": list(resolution), "mode": "fill",
                                    "anchor": layer.anchor}, resolution)
@@ -145,6 +147,7 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution)
             fallback = {"size": [placement.fill, placement.fill], "mode": "fit"}
             im = resize.apply(im, fallback if auto else layer.resize, measure_canvas)
             im = mosaic.apply(im, layer.mosaic, measure_canvas)
+            im = repeat.apply(im, layer.repeat)
             im = rotate.apply(im, placement.angle, placement.flip)
             if scale != 1.0:
                 im = im.resize(
