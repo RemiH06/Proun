@@ -202,6 +202,82 @@ class Configuracion(unittest.TestCase):
             self.assertEqual(cli.main(["--quiet"], config=["fuentes"]), 2)
 
 
+class Limpieza(unittest.TestCase):
+    def poblado(self):
+        destino = Path(tempfile.mkdtemp(dir=RAIZ))
+        cli.main(["--images", str(FUENTES), "--out", str(destino), "--quiet",
+                  "--resolutions", "160x100", "200x150", "--colors", "ff0000", "00ff00",
+                  "--seed", "5"])
+        return destino
+
+    def limpiar(self, destino, *extra):
+        with redirect_stdout(io.StringIO()) as salida:
+            codigo = cli.main(["--out", str(destino), "--clean", *extra])
+        return codigo, salida.getvalue()
+
+    def test_borra_todo(self):
+        destino = self.poblado()
+        self.assertEqual(len(generados(destino)), 4)
+        codigo, texto = self.limpiar(destino, "--yes")
+        self.assertEqual(codigo, 0)
+        self.assertIn("4 archivos borrados", texto)
+        self.assertEqual(generados(destino), [])
+
+    def test_filtra_por_color(self):
+        destino = self.poblado()
+        self.limpiar(destino, "--colors", "ff0000", "--yes")
+        restantes = generados(destino)
+        self.assertEqual(len(restantes), 2)
+        self.assertTrue(all("00ff00" in nombre for nombre in restantes))
+
+    def test_filtra_por_resolucion(self):
+        destino = self.poblado()
+        self.limpiar(destino, "--resolutions", "160x100", "--yes")
+        self.assertTrue(all(n.startswith("200x150/") for n in generados(destino)))
+        self.assertFalse((destino / "160x100").exists())
+
+    def test_dry_run_no_borra_ni_pregunta(self):
+        destino = self.poblado()
+        codigo, texto = self.limpiar(destino, "--dry-run")
+        self.assertEqual(codigo, 0)
+        self.assertIn("se borrarían", texto)
+        self.assertEqual(len(generados(destino)), 4)
+
+    def test_sin_confirmacion_no_borra(self):
+        destino = self.poblado()
+        args = cli.parse_args(["--out", str(destino), "--clean"])
+        with redirect_stdout(io.StringIO()) as salida:
+            cli.clean(args, ask=lambda _: "n")
+        self.assertIn("cancelado", salida.getvalue())
+        self.assertEqual(len(generados(destino)), 4)
+
+    def test_confirmando_si_borra(self):
+        destino = self.poblado()
+        args = cli.parse_args(["--out", str(destino), "--clean"])
+        with redirect_stdout(io.StringIO()):
+            cli.clean(args, ask=lambda _: "s")
+        self.assertEqual(generados(destino), [])
+
+    def test_no_pide_imagenes(self):
+        # Limpiar no necesita sources, a diferencia de generar.
+        destino = self.poblado()
+        codigo, _ = self.limpiar(destino, "--yes")
+        self.assertEqual(codigo, 0)
+
+    def test_el_directorio_sale_de_la_configuracion(self):
+        destino = self.poblado()
+        args = cli.parse_args(["--clean", "--yes"])
+        with redirect_stdout(io.StringIO()):
+            cli.clean(args, config={"output": str(destino)})
+        self.assertEqual(generados(destino), [])
+
+    def test_directorio_sin_nada_que_borrar(self):
+        vacio = Path(tempfile.mkdtemp(dir=RAIZ))
+        codigo, texto = self.limpiar(vacio, "--yes")
+        self.assertEqual(codigo, 0)
+        self.assertIn("no hay wallpapers", texto)
+
+
 class Errores(unittest.TestCase):
     def silencioso(self, argv):
         error = io.StringIO()

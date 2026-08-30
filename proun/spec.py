@@ -104,7 +104,7 @@ def build(data: dict) -> Spec:
     # Ausente significa "usa el default"; presente pero vacío es un error de
     # quien escribió la especificación, y callarlo lo escondería.
     declared = data.get("resolutions")
-    resolutions = _resolutions(["1920x1080"] if declared is None else declared)
+    resolutions = parse_resolutions(["1920x1080"] if declared is None else declared)
     palette = _palette(data)
     defaults = data.get("defaults") or {}
     if not isinstance(defaults, dict):
@@ -121,7 +121,7 @@ def build(data: dict) -> Spec:
     if not isinstance(start, int) or isinstance(start, bool) or start < 0:
         raise SpecError(f"start_index debe ser un entero no negativo, llegó {start!r}")
 
-    reference = _resolutions([data["reference"]])[0] if data.get("reference") else resolutions[0]
+    reference = parse_resolutions([data["reference"]])[0] if data.get("reference") else resolutions[0]
 
     return Spec(
         sources=sources,
@@ -162,7 +162,8 @@ def _relative_sources(data: dict, base: Path) -> dict:
     return out
 
 
-def _resolutions(value) -> tuple[tuple[int, int], ...]:
+def parse_resolutions(value) -> tuple[tuple[int, int], ...]:
+    """Normaliza "1920x1080", [1920, 1080] o una lista de ambos."""
     if isinstance(value, (str, tuple)) or (isinstance(value, list) and len(value) == 2
                                            and all(isinstance(v, int) for v in value)):
         value = [value]

@@ -10,7 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import colors, compose, naming, spec as spec_module
+from . import cleanup, colors, compose, naming, spec as spec_module
 from .errors import SpecError
 
 
@@ -53,12 +53,18 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--no-scale", action="store_true",
                    help="no reescalar las medidas al cambiar de resolución")
     p.add_argument("--overwrite", action="store_true", help="sobrescribir archivos existentes")
+    p.add_argument("--clean", action="store_true",
+                   help="borrar los wallpapers generados en vez de crear nuevos; se puede "
+                        "acotar con --resolutions, --colors y --seeds")
+    p.add_argument("--yes", "-y", action="store_true",
+                   help="no preguntar antes de borrar")
     p.add_argument("--dry-run", action="store_true", help="solo listar lo que se generaría")
     p.add_argument("--quiet", action="store_true", help="no imprimir cada archivo")
     return p.parse_args(argv)
 
 
-def to_data(args: argparse.Namespace, config: dict | None = None) -> dict:
+def to_data(args: argparse.Namespace, config: dict | None = None,
+            require_sources: bool = True) -> dict:
     """Fusiona la configuración de código, el archivo y las banderas.
 
     Precedencia de menor a mayor: el diccionario que venga de `main.py`, luego
@@ -118,7 +124,7 @@ def to_data(args: argparse.Namespace, config: dict | None = None) -> dict:
             defaults["tones"] = False
         data["defaults"] = defaults
 
-    if not data.get("sources"):
+    if require_sources and not data.get("sources"):
         raise SpecError("hacen falta imágenes: usa --images o un --spec con 'sources'")
     return data
 
@@ -153,9 +159,43 @@ def run(config: spec_module.Spec, *, overwrite=False, dry_run=False, quiet=False
     return written
 
 
+def clean(args: argparse.Namespace, config: dict | None = None, ask=input) -> int:
+    """Borra los wallpapers generados. El directorio sale de la configuración;
+    los filtros, solo de las banderas, para que nada de CONFIG limite el borrado
+    sin que se note."""
+    data = to_data(args, config, require_sources=False)
+    output = Path(str(data.get("output", "wallpapers"))).expanduser()
+    encontrados = cleanup.find(
+        output,
+        resolutions=spec_module.parse_resolutions(args.resolutions) if args.resolutions else None,
+        palette=[colors.parse(c) for c in args.colors] if args.colors else None,
+        seeds=args.seeds,
+    )
+
+    if not encontrados:
+        print(f"no hay wallpapers que borrar en {output}/")
+        return 0
+    if args.dry_run:
+        for path in encontrados:
+            print(f"  {path}")
+        print(f"{len(encontrados)} archivos se borrarían")
+        return 0
+    if not args.yes:
+        respuesta = ask(f"borrar {len(encontrados)} archivos de {output}/ [s/N]: ")
+        if respuesta.strip().lower() not in ("s", "si", "sí", "y", "yes"):
+            print("cancelado")
+            return 0
+
+    borrados = cleanup.remove(encontrados, output)
+    print(f"{borrados} archivos borrados")
+    return 0
+
+
 def main(argv=None, config: dict | None = None) -> int:
     args = parse_args(argv)
     try:
+        if args.clean:
+            return clean(args, config)
         config = spec_module.build(to_data(args, config))
         if not args.quiet:
             print(
