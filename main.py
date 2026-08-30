@@ -69,6 +69,7 @@ CONFIG = {
 #     "resize": {"size": [0.5, 0.5], "mode": "fill"},
 #     "mosaic": {"grid": [4, 1], "mirror": True},
 #     "rotate": {"range": [-6, 6], "step": 3},
+#     "stain": {"amount": 0.6, "scale": 0.3, "edges": 0.8, "threshold": 0.4},
 #     "tones": {"normalize": True, "gamma": 1.2, "invert": False},
 #     "recolor": {"mode": "duotone", "strength": 0.9, "mix_with": "tones"},
 #     "color": "#ffb347",  # ignora el color del lote

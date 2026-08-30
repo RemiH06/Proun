@@ -16,7 +16,7 @@ from . import colors, loading
 from .errors import SpecError
 
 LAYER_KEYS = {
-    "src", "crop", "resize", "mosaic", "rotate", "tones", "recolor", "color",
+    "src", "crop", "resize", "mosaic", "rotate", "stain", "tones", "recolor", "color",
     "opacity", "blend", "position", "anchor", "copies", "repeat", "cover",
 }
 
@@ -39,6 +39,7 @@ class Layer:
     mosaic: object = None
     repeat: object = None
     rotate: object = None
+    stain: object = None
     tones: object = True
     recolor: dict = field(default_factory=dict)
     color: object = None
@@ -317,6 +318,7 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
                     mosaic=merged.get("mosaic"),
                     repeat=merged.get("repeat"),
                     rotate=merged.get("rotate"),
+                    stain=merged.get("stain"),
                     tones=merged.get("tones", True),
                     recolor=dict(recolor),
                     color=merged.get("color"),

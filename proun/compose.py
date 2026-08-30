@@ -19,7 +19,7 @@ from PIL import Image
 from . import colors, layout, loading
 from .errors import SourceError
 from .ops import (background, blend, crop, finish, mosaic, recolor, repeat, resize,
-                  rotate, tones)
+                  rotate, stain, tones)
 from .spec import Layer, Spec
 
 
@@ -81,8 +81,8 @@ def prepare(spec: Spec, current: Plan, resolution: tuple[int, int]) -> tuple[Sha
     measure_canvas = spec.reference if spec.scale_with_resolution else resolution
     scale = _scale(spec, resolution)
     return tuple(
-        _shape_layer(placement, measure_canvas, scale, resolution)
-        for placement in current.placements
+        _shape_layer(placement, measure_canvas, scale, resolution, current.seed, indice)
+        for indice, placement in enumerate(current.placements)
     )
 
 
@@ -129,7 +129,8 @@ def save(image: Image.Image, path: Path, fmt: str = "png", quality: int = 92,
     return path
 
 
-def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution) -> "Shaped":
+def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
+                 seed: int, indice: int) -> "Shaped":
     layer = placement.layer
     try:
         im = loading.load(layer.src)
@@ -154,6 +155,11 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution)
                     (max(1, round(im.width * scale)), max(1, round(im.height * scale))),
                     Image.Resampling.LANCZOS,
                 )
+        if layer.stain:
+            # La semilla se deriva, no se saca del generador del plan: así una
+            # capa manchada no corre el sorteo de las demás ni cambia los
+            # wallpapers que ya existen.
+            im = stain.apply(im, layer.stain, random.Random(seed * 1_000_003 + indice))
         tonal = tones.apply(im, layer.tones)
         keep = str(layer.recolor.get("mix_with", "tones")).lower() == "source"
         return Shaped(tonal=tonal, source=im if keep else None)
