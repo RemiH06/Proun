@@ -19,7 +19,7 @@ from PIL import Image
 from . import colors, layout, loading
 from .errors import SourceError
 from .ops import (background, blend, crop, finish, mosaic, recolor, repeat, resize,
-                  rotate, stain, tones)
+                  rotate, stain, tones, transparency)
 from .spec import Layer, Spec
 
 
@@ -160,7 +160,7 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
             # capa manchada no corre el sorteo de las demás ni cambia los
             # wallpapers que ya existen.
             im = stain.apply(im, layer.stain, random.Random(seed * 1_000_003 + indice))
-        tonal = tones.apply(im, layer.tones)
+        tonal = transparency.apply(tones.apply(im, layer.tones), layer.transparent)
         keep = str(layer.recolor.get("mix_with", "tones")).lower() == "source"
         return Shaped(tonal=tonal, source=im if keep else None)
     except SourceError:
