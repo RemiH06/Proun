@@ -143,10 +143,18 @@ class Fuentes(unittest.TestCase):
         self.assertEqual(config.sources[0].crop, [0, 0, 10, 10])
         self.assertEqual(config.sources[0].opacity, 0.5)
 
-    def test_repeat_duplica(self):
-        config = spec.build(base(sources=[{"src": str(FUENTES / "a.png"), "repeat": 3}]))
+    def test_copies_duplica(self):
+        config = spec.build(base(sources=[{"src": str(FUENTES / "a.png"), "copies": 3}]))
         self.assertEqual(len(config.sources), 3)
         self.assertEqual(len({c.src for c in config.sources}), 1)
+
+    def test_repeat_es_la_operacion_no_el_conteo(self):
+        # copies dice cuántas veces entra la imagen al collage;
+        # repeat es la operación que la estampa sobre sí misma.
+        config = spec.build(base(sources=[{"src": str(FUENTES / "a.png"),
+                                           "repeat": {"step": [0.5, 0], "times": 2}}]))
+        self.assertEqual(len(config.sources), 1)
+        self.assertEqual(config.sources[0].repeat, {"step": [0.5, 0], "times": 2})
 
     def test_notas_con_guion_bajo(self):
         config = spec.build(base(sources=[{"src": str(FUENTES / "a.png"), "_nota": "hola"}]))
@@ -170,7 +178,7 @@ class Fuentes(unittest.TestCase):
             spec.build(base(sources=[{"crop": [0, 0, 10, 10]}]))
 
     def test_valores_invalidos_en_una_capa(self):
-        for extra in ({"opacity": 2}, {"recolor": "duotone"}, {"repeat": 0}, {"repeat": 9999}):
+        for extra in ({"opacity": 2}, {"recolor": "duotone"}, {"copies": 0}, {"copies": 9999}):
             with self.assertRaises(SpecError, msg=extra):
                 spec.build(base(sources=[{"src": str(FUENTES / "a.png"), **extra}]))
 

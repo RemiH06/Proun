@@ -17,7 +17,7 @@ from .errors import SpecError
 
 LAYER_KEYS = {
     "src", "crop", "resize", "mosaic", "rotate", "tones", "recolor", "color",
-    "opacity", "blend", "position", "anchor", "repeat", "cover",
+    "opacity", "blend", "position", "anchor", "copies", "repeat", "cover",
 }
 
 SPEC_KEYS = {
@@ -37,6 +37,7 @@ class Layer:
     crop: object = None
     resize: object = None
     mosaic: object = None
+    repeat: object = None
     rotate: object = None
     tones: object = True
     recolor: dict = field(default_factory=dict)
@@ -284,9 +285,9 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
         if not paths:
             raise SpecError(f"ningún archivo coincide con {entry['src']!r}")
         merged = {**defaults, **{k: v for k, v in entry.items() if k != "src"}}
-        repeat = merged.pop("repeat", 1)
-        if not isinstance(repeat, int) or isinstance(repeat, bool) or not 1 <= repeat <= 500:
-            raise SpecError(f"repeat debe ser un entero entre 1 y 500, llegó {repeat!r}")
+        copies = merged.pop("copies", 1)
+        if not isinstance(copies, int) or isinstance(copies, bool) or not 1 <= copies <= 500:
+            raise SpecError(f"copies debe ser un entero entre 1 y 500, llegó {copies!r}")
 
         cover = merged.pop("cover", False)
         if not isinstance(cover, bool):
@@ -308,12 +309,13 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
             raise SpecError(f"opacity debe estar entre 0 y 1, llegó {opacity!r}")
 
         for path in paths:
-            for _ in range(repeat):
+            for _ in range(copies):
                 layers.append(Layer(
                     src=path,
                     crop=merged.get("crop"),
                     resize=merged.get("resize"),
                     mosaic=merged.get("mosaic"),
+                    repeat=merged.get("repeat"),
                     rotate=merged.get("rotate"),
                     tones=merged.get("tones", True),
                     recolor=dict(recolor),
