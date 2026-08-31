@@ -78,6 +78,22 @@ def apply(im: Image.Image, spec, rng=None) -> Image.Image:
     return out
 
 
+def clouds(size: tuple[int, int], spec, rng) -> Image.Image:
+    """Máscara de nubes suelta, para quien la quiera usar sin comer alfa.
+
+    La usa `ops/background` para manchar el papel: ahí no se trata de borrar
+    nada sino de mezclar entre dos tonos.
+    """
+    mapa = _clouds(size, _positive(spec.get("scale", 0.4), "stain.scale", top=4),
+                   int(spec.get("octaves", 3)), rng)
+    umbral = spec.get("threshold", 0)
+    if umbral:
+        mapa = mapa.point(_knee(_unit(umbral, "stain.threshold")))
+    if spec.get("invert", False):
+        mapa = ImageChops.invert(mapa)
+    return mapa
+
+
 def _clouds(size: tuple[int, int], scale: float, octaves: int, rng) -> Image.Image:
     """Ruido de nubes: varias capas de ruido grueso suavizado y sumadas.
 

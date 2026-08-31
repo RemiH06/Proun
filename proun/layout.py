@@ -144,6 +144,26 @@ def explicit(value, size, canvas, anchor="center", rng=None) -> tuple[int, int]:
     return (round(px[0] - size[0] * ax), round(px[1] - size[1] * ay))
 
 
+def clamp(position, size, canvas, bleed) -> tuple[int, int]:
+    """Limita cuánto se sale una capa del lienzo.
+
+    `bleed` es fracción del tamaño de la propia capa: 0 la deja completamente
+    dentro y 1 le permite salirse entera. Se aplica al colocar, no al sortear,
+    porque hasta ese momento no se sabe cuánto mide la capa.
+    """
+    salida = []
+    for eje in (0, 1):
+        margen = round(size[eje] * bleed[eje])
+        minimo = -margen
+        maximo = canvas[eje] - size[eje] + margen
+        if minimo > maximo:
+            # La capa es más grande que el lienzo más el margen: se centra.
+            salida.append(round((canvas[eje] - size[eje]) / 2))
+        else:
+            salida.append(min(max(position[eje], minimo), maximo))
+    return (salida[0], salida[1])
+
+
 def _unit(value, name, high=1.0) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= high:
         raise SpecError(f"{name} debe estar entre 0 y {high}, llegó {value!r}")

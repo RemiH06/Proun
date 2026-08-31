@@ -1,5 +1,6 @@
 """Pruebas de proun.ops.background."""
 
+import random
 import unittest
 
 from proun.errors import SpecError
@@ -79,6 +80,43 @@ class Degradados(unittest.TestCase):
             fondo = background.build(tam, AZUL, {"gradient": ["#fff", "#000"],
                                                  "direction": "diagonal"})
             self.assertEqual(fondo.size, tam, tam)
+
+
+class Manchado(unittest.TestCase):
+    def test_rompe_la_uniformidad_del_solido(self):
+        limpio = background.build(TAM, AZUL, {"solid": "#f2efe8"})
+        sucio = background.build(TAM, AZUL,
+                                 {"solid": "#f2efe8", "stain": {"amount": 0.4}},
+                                 random.Random(3))
+        self.assertEqual(len(set(limpio.convert("L").getextrema())), 1)
+        oscuro, claro = sucio.convert("L").getextrema()
+        self.assertGreater(claro - oscuro, 5)
+
+    def test_es_reproducible(self):
+        spec = {"solid": "#f2efe8", "stain": {"amount": 0.4}}
+        self.assertEqual(background.build(TAM, AZUL, spec, random.Random(3)).tobytes(),
+                         background.build(TAM, AZUL, spec, random.Random(3)).tobytes())
+
+    def test_tambien_mancha_degradados(self):
+        sucio = background.build(TAM, AZUL,
+                                 {"gradient": ["#ffffff", "#eeeeee"],
+                                  "stain": {"amount": 0.5, "color": "#333333"}},
+                                 random.Random(4))
+        self.assertLess(sucio.convert("L").getextrema()[0], 200)
+
+    def test_amount_cero_no_hace_nada(self):
+        spec = {"solid": "#f2efe8", "stain": {"amount": 0}}
+        self.assertEqual(background.build(TAM, AZUL, spec).tobytes(),
+                         background.build(TAM, AZUL, {"solid": "#f2efe8"}).tobytes())
+
+    def test_exige_generador(self):
+        with self.assertRaises(SpecError):
+            background.build(TAM, AZUL, {"solid": "#fff", "stain": {"amount": 0.3}})
+
+    def test_validacion(self):
+        for malo in ({"amount": 2}, {"cantidad": 0.3}, "mucho"):
+            with self.assertRaises(SpecError, msg=malo):
+                background.build(TAM, AZUL, {"solid": "#fff", "stain": malo}, random.Random(1))
 
 
 class Validacion(unittest.TestCase):

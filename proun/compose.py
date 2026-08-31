@@ -17,7 +17,7 @@ from pathlib import Path
 from PIL import Image
 
 from . import colors, layout, loading
-from .errors import SourceError
+from .errors import SourceError, SpecError
 from .ops import (background, blend, crop, finish, mosaic, recolor, repeat, resize,
                   rotate, stain, tones, transparency)
 from .spec import Layer, Spec
@@ -30,6 +30,7 @@ class Placement:
     flip: str
     center: tuple[float, float]
     fill: float
+    color: object = None
 
 
 @dataclass(frozen=True)
@@ -51,17 +52,42 @@ def plan(spec: Spec, seed: int) -> Plan:
     rng.shuffle(resto)
 
     placements = [
-        Placement(layer=layer, angle=angle, flip=flip, center=(0.5, 0.5), fill=1.0)
+        Placement(layer=layer, angle=angle, flip=flip, center=(0.5, 0.5), fill=1.0,
+                  color=_choose_color(layer.color, rng))
         for layer, (angle, flip) in zip(covers, [rotate.decide(c.rotate, rng) for c in covers])
     ]
     turns = [rotate.decide(layer.rotate, rng) for layer in resto]
     centers = layout.positions(len(resto), rng, spec.layout)
     fills = layout.sizes(len(resto), rng, spec.layout)
     placements += [
-        Placement(layer=layer, angle=angle, flip=flip, center=center, fill=fill)
+        Placement(layer=layer, angle=angle, flip=flip,
+                  center=_region_center(center, layer.region), fill=fill,
+                  color=_choose_color(layer.color, rng))
         for layer, (angle, flip), center, fill in zip(resto, turns, centers, fills)
     ]
     return Plan(seed=seed, placements=tuple(placements))
+
+
+def _region_center(center, region):
+    """Mete el centro sorteado dentro de la región declarada por la capa.
+
+    No consume el generador: reusa el sorteo que ya se hizo y lo remapea. Así
+    una capa sin `region` sigue cayendo exactamente donde caía antes.
+    """
+    if region is None:
+        return center
+    x0, y0, x1, y1 = region
+    dentro = (min(max(center[0], 0.0), 1.0), min(max(center[1], 0.0), 1.0))
+    return (x0 + dentro[0] * (x1 - x0), y0 + dentro[1] * (y1 - y0))
+
+
+def _choose_color(color, rng: random.Random):
+    """Una capa puede declarar varios colores y se sortea uno por wallpaper."""
+    if isinstance(color, list):
+        if not color:
+            raise SpecError("la lista de colores de una capa está vacía")
+        return rng.choice(color)
+    return color
 
 
 @dataclass(frozen=True)
@@ -91,12 +117,14 @@ def render(spec: Spec, current: Plan, resolution: tuple[int, int], main,
     main = colors.parse(main)
     if shaped is None:
         shaped = prepare(spec, current, resolution)
-    canvas = background.build(resolution, main, spec.background)
+    canvas = background.build(resolution, main, spec.background,
+                              random.Random(current.seed ^ 0x5EED))
 
     for placement, base in zip(current.placements, shaped):
         layer = placement.layer
         try:
-            tile = recolor.apply(base.tonal, layer.color or main, layer.recolor, base.source)
+            tile = recolor.apply(base.tonal, placement.color or main, layer.recolor,
+                                 base.source)
         except Exception as exc:
             raise SourceError(f"falló el recoloreado de {layer.src.name}: {exc}") from exc
         if layer.cover:
@@ -107,6 +135,8 @@ def render(spec: Spec, current: Plan, resolution: tuple[int, int], main,
             )
         else:
             position = layout.to_pixels(placement.center, tile.size, resolution)
+            if layer.bleed is not None:
+                position = layout.clamp(position, tile.size, resolution, layer.bleed)
         blend.composite(canvas, tile, position,
                         mode=placement.layer.blend, opacity=placement.layer.opacity)
 

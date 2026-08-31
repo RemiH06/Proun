@@ -13,12 +13,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import colors, loading
+from .geometry import anchor_factors
 from .errors import SpecError
 
 LAYER_KEYS = {
     "src", "crop", "resize", "mosaic", "rotate", "stain", "tones", "transparent",
     "recolor", "color",
-    "opacity", "blend", "position", "anchor", "copies", "repeat", "cover",
+    "opacity", "blend", "position", "anchor", "region", "bleed", "copies",
+    "repeat", "cover",
 }
 
 SPEC_KEYS = {
@@ -49,6 +51,8 @@ class Layer:
     blend: str = "normal"
     position: object = None
     anchor: str = "center"
+    region: object = None
+    bleed: object = None
     cover: bool = False
 
 
@@ -264,6 +268,47 @@ def _layer_range(value, available: int) -> tuple[int, int] | None:
     return (low, high)
 
 
+def _region(value):
+    """Rectángulo del lienzo donde puede caer el centro de una capa.
+
+    [x0, y0, x1, y1] en fracciones, o un ancla nombrada, que equivale al noveno
+    correspondiente del lienzo.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        fx, fy = anchor_factors(value)
+        return (max(0.0, fx - 1 / 6), max(0.0, fy - 1 / 6),
+                min(1.0, fx + 1 / 6), min(1.0, fy + 1 / 6))
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        raise SpecError(f"region debe ser [x0, y0, x1, y1] o un ancla, llegó {value!r}")
+    valores = []
+    for v in value:
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 1:
+            raise SpecError(f"region va en fracciones de 0 a 1, llegó {v!r}")
+        valores.append(float(v))
+    x0, y0, x1, y1 = valores
+    if x0 >= x1 or y0 >= y1:
+        raise SpecError(f"region sin área: {value!r}")
+    return (x0, y0, x1, y1)
+
+
+def _bleed(value):
+    """Cuánto puede salirse la capa del lienzo, en fracción de su propio tamaño."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        value = [value, value]
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        raise SpecError(f"bleed debe ser un número o un par [x, y], llegó {value!r}")
+    salida = []
+    for v in value:
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 1:
+            raise SpecError(f"bleed va de 0 (nada afuera) a 1 (todo afuera), llegó {v!r}")
+        salida.append(float(v))
+    return (salida[0], salida[1])
+
+
 def _sources(value, defaults: dict) -> tuple[Layer, ...]:
     if not value:
         raise SpecError("hace falta al menos una imagen en sources")
@@ -329,6 +374,8 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
                     blend=str(merged.get("blend", "normal")),
                     position=merged.get("position"),
                     anchor=merged.get("anchor", "center"),
+                    region=_region(merged.get("region")),
+                    bleed=_bleed(merged.get("bleed")),
                     cover=cover,
                 ))
     return tuple(layers)

@@ -154,6 +154,29 @@ class PosicionExplicita(unittest.TestCase):
             layout.explicit([0, 0], (10, 10), (1000, 500), anchor="esquinita")
 
 
+class Sangrado(unittest.TestCase):
+    def test_cero_deja_la_capa_completamente_dentro(self):
+        self.assertEqual(layout.clamp((-50, -50), (100, 100), (1000, 500), (0, 0)), (0, 0))
+        self.assertEqual(layout.clamp((9999, 9999), (100, 100), (1000, 500), (0, 0)), (900, 400))
+
+    def test_permite_salirse_esa_fraccion_del_tamano(self):
+        # bleed 0.25 de una capa de 100 px son 25 px de margen.
+        self.assertEqual(layout.clamp((-80, 0), (100, 100), (1000, 500), (0.25, 0.25))[0], -25)
+        self.assertEqual(layout.clamp((980, 0), (100, 100), (1000, 500), (0.25, 0.25))[0], 925)
+
+    def test_uno_permite_salirse_entera(self):
+        self.assertEqual(layout.clamp((-100, 0), (100, 100), (1000, 500), (1, 1))[0], -100)
+
+    def test_no_toca_lo_que_ya_esta_dentro(self):
+        self.assertEqual(layout.clamp((300, 200), (100, 100), (1000, 500), (0, 0)), (300, 200))
+
+    def test_ejes_independientes(self):
+        self.assertEqual(layout.clamp((-80, -80), (100, 100), (1000, 500), (0.5, 0)), (-50, 0))
+
+    def test_capa_mas_grande_que_el_lienzo_se_centra(self):
+        self.assertEqual(layout.clamp((0, 0), (1200, 700), (1000, 500), (0, 0)), (-100, -100))
+
+
 class Validacion(unittest.TestCase):
     def test_clave_desconocida(self):
         with self.assertRaises(SpecError):

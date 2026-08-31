@@ -76,8 +76,11 @@ CONFIG = {
 #     "color": "#ffb347",  # ignora el color del lote
 #     "opacity": 0.8,
 #     "blend": "multiply",
-#     "position": [0.5, 0.5],
+#     "position": [0.5, 0.5],   # posición exacta; manda sobre region
 #     "anchor": "center",
+#     "region": [0.5, 0, 1, 0.5],   # o "topright": dónde puede caer al azar
+#     "bleed": 0.15,       # cuánto puede salirse, en fracción de su tamaño
+#     "color": ["#ff0000", "#3ba7ff"],   # sortea uno por wallpaper
 #     "repeat": {"step": [0.5, 0], "times": 2, "mirror": True},
 #     "copies": 2,         # cuántas veces entra esta imagen al collage
 # }

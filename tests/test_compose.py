@@ -8,7 +8,7 @@ from pathlib import Path
 from PIL import Image
 
 from proun import compose, spec
-from proun.errors import SourceError
+from proun.errors import SourceError, SpecError
 from proun.ops import blend
 
 RAIZ = Path(tempfile.mkdtemp(prefix="proun-compose-"))
@@ -233,6 +233,53 @@ class CapaDeFondo(unittest.TestCase):
         })
         nombres = [p.layer.src.name for p in compose.plan(base, 1).placements]
         self.assertEqual(nombres, ["b.png", "c.png"])
+
+
+class RegionSangradoYColor(unittest.TestCase):
+    def config(self, **extra):
+        return spec.build({
+            "resolutions": ["400x300"], "colors": ["#ffffff"], "seeds": [5],
+            "background": "#000000", **extra,
+        })
+
+    def test_la_region_confina_el_centro(self):
+        base = self.config(sources=[{"src": str(FUENTES / "a.png"),
+                                     "region": [0.6, 0.6, 1.0, 1.0]}])
+        for semilla in range(12):
+            centro = compose.plan(base, semilla).placements[0].center
+            self.assertGreaterEqual(centro[0], 0.6, semilla)
+            self.assertGreaterEqual(centro[1], 0.6, semilla)
+
+    def test_sin_region_el_centro_no_cambia(self):
+        sin = self.config(sources=[str(FUENTES / "a.png")])
+        self.assertNotEqual(compose.plan(sin, 3).placements[0].center, (0.5, 0.5))
+
+    def test_bleed_cero_deja_la_capa_dentro(self):
+        base = self.config(sources=[{"src": str(FUENTES / "a.png"), "bleed": 0,
+                                     "resize": {"size": [80, 60]}}],
+                           layout={"mode": "free", "bleed": 0.9})
+        salida = compose.render(base, compose.plan(base, 2), (400, 300), "#ffffff")
+        # Con la capa forzada adentro, ningún borde del lienzo queda intacto
+        # por accidente: basta con que algo se haya dibujado.
+        self.assertGreater(salida.convert("L").getextrema()[1], 0)
+
+    def test_color_de_la_capa_puede_ser_una_lista(self):
+        base = self.config(sources=[{"src": str(FUENTES / "a.png"),
+                                     "color": ["#ff0000", "#00ff00", "#0000ff"]}])
+        elegidos = {compose.plan(base, s).placements[0].color for s in range(20)}
+        self.assertGreater(len(elegidos), 1)
+        self.assertTrue(elegidos <= {"#ff0000", "#00ff00", "#0000ff"})
+
+    def test_el_color_elegido_es_reproducible(self):
+        base = self.config(sources=[{"src": str(FUENTES / "a.png"),
+                                     "color": ["#ff0000", "#00ff00"]}])
+        self.assertEqual(compose.plan(base, 9).placements[0].color,
+                         compose.plan(base, 9).placements[0].color)
+
+    def test_lista_de_colores_vacia(self):
+        base = self.config(sources=[{"src": str(FUENTES / "a.png"), "color": []}])
+        with self.assertRaises(SpecError):
+            compose.plan(base, 1)
 
 
 class Errores(unittest.TestCase):

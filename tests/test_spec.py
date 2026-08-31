@@ -209,6 +209,38 @@ class Cover(unittest.TestCase):
             spec.build(base(sources=[{"src": str(FUENTES / "a.png"), "cover": "si"}]))
 
 
+class RegionYSangrado(unittest.TestCase):
+    def capa(self, **extra):
+        return spec.build(base(sources=[{"src": str(FUENTES / "a.png"), **extra}])).sources[0]
+
+    def test_region_explicita(self):
+        self.assertEqual(self.capa(region=[0.5, 0, 1, 0.5]).region, (0.5, 0.0, 1.0, 0.5))
+
+    def test_region_por_ancla(self):
+        x0, y0, x1, y1 = self.capa(region="topright").region
+        self.assertGreater(x0, 0.5)
+        self.assertLess(y1, 0.5)
+
+    def test_region_invalida(self):
+        for malo in ([0.5, 0, 0.2, 1], [0, 0, 1], [0, 0, 2, 1], "arriba", [0, 0, 1, 0]):
+            with self.assertRaises(SpecError, msg=malo):
+                self.capa(region=malo)
+
+    def test_bleed_numero_y_par(self):
+        self.assertEqual(self.capa(bleed=0.3).bleed, (0.3, 0.3))
+        self.assertEqual(self.capa(bleed=[0.2, 0]).bleed, (0.2, 0.0))
+
+    def test_bleed_invalido(self):
+        for malo in (-0.1, 2, "poco", [0.5], True):
+            with self.assertRaises(SpecError, msg=malo):
+                self.capa(bleed=malo)
+
+    def test_ausentes_por_defecto(self):
+        capa = self.capa()
+        self.assertIsNone(capa.region)
+        self.assertIsNone(capa.bleed)
+
+
 class Defaults(unittest.TestCase):
     def test_se_aplican_a_todas(self):
         config = spec.build(base(defaults={"rotate": "random", "blend": "screen"},

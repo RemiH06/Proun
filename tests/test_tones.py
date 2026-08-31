@@ -106,6 +106,46 @@ class Ajustes(unittest.TestCase):
         self.assertEqual(salida.size, (64, 64))
 
 
+class Dominante(unittest.TestCase):
+    def con_fondo(self, fondo, sujeto, w=80, h=80):
+        """Imagen tipo foto: casi todo fondo, un sujeto chico encima."""
+        im = Image.new("RGBA", (w, h), (fondo, fondo, fondo, 255))
+        im.paste((sujeto, sujeto, sujeto, 255), (10, 10, 30, 30))
+        return im
+
+    def test_lleva_el_fondo_claro_al_blanco(self):
+        salida = tones.apply(self.con_fondo(190, 40), {"normalize": False, "dominant": "light"})
+        self.assertEqual(salida.convert("L").getpixel((60, 60)), 255)
+        self.assertLess(salida.convert("L").getpixel((20, 20)), 100)
+
+    def test_lleva_el_fondo_oscuro_al_negro(self):
+        salida = tones.apply(self.con_fondo(60, 220), {"normalize": False, "dominant": "dark"})
+        self.assertEqual(salida.convert("L").getpixel((60, 60)), 0)
+
+    def test_light_invierte_una_foto_oscura(self):
+        # El fondo oscuro se vuelve blanco: la foto sale como negativo y el
+        # sujeto queda de tinta, que es lo que la hace legible sobre papel.
+        salida = tones.apply(self.con_fondo(50, 210), {"normalize": False, "dominant": "light"})
+        self.assertEqual(salida.convert("L").getpixel((60, 60)), 255)
+        self.assertLess(salida.convert("L").getpixel((20, 20)), 120)
+
+    def test_auto_elige_el_extremo_mas_cercano(self):
+        clara = tones.apply(self.con_fondo(200, 30), {"normalize": False, "dominant": "auto"})
+        oscura = tones.apply(self.con_fondo(40, 220), {"normalize": False, "dominant": "auto"})
+        self.assertEqual(clara.convert("L").getpixel((60, 60)), 255)
+        self.assertEqual(oscura.convert("L").getpixel((60, 60)), 0)
+
+    def test_no_toca_una_imagen_ya_blanca(self):
+        blanca = Image.new("RGBA", (40, 40), (255, 255, 255, 255))
+        blanca.paste((0, 0, 0, 255), (5, 5, 15, 15))
+        salida = tones.apply(blanca, {"normalize": False, "dominant": "light"})
+        self.assertEqual(salida.convert("L").getpixel((30, 30)), 255)
+
+    def test_valor_invalido(self):
+        with self.assertRaises(SpecError):
+            tones.apply(lavada(), {"dominant": "medio"})
+
+
 class Validacion(unittest.TestCase):
     def test_clave_desconocida(self):
         with self.assertRaises(SpecError):
