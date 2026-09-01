@@ -1,4 +1,4 @@
-"""Alineada: el registro exacto del fondo de referencia.
+"""Alineada: el registro del fondo de referencia.
 
 Piezas que se tocan entre sí formando una banda irregular, con papel vacío
 arriba y abajo. Es `layout.mode = "align"`: cada pieza cae en el hueco más
@@ -7,14 +7,26 @@ al azar en cualquier parte del lienzo.
 
 La clave para que quede como banda y no como pared es un `layout.size` bajo:
 con piezas grandes el bloque crece más alto que el lienzo y se recorta arriba
-y abajo, que también se puede ver bien pero ya no dej el margen de papel.
+y abajo, que también se puede ver bien pero ya no deja el margen de papel.
+
+Cuatro cosas para que no se sienta plana:
+- `PROTAGONISTA` entra con un `resize` explícito bien por encima del rango
+  general, así que el empaquetador la trata como una pieza grande entre
+  piezas chicas y ancla la composición.
+- Las piezas gráficas (`GRAFICAS`) llevan `repeat`, estampadas sobre sí
+  mismas antes de entrar al bloque.
+- Una textura entra por `mosaic` en vez de foto suelta.
+- El fondo lleva bastante `stain`, con `threshold` para que se lea como
+  mancha y no como desvanecido parejo.
 
     python -m recetas.alineada
 """
 
 from proun.cli import main
 
-from ._comun import CYANOTIPO_TONES, CYANOTIPO_TRANSPARENT, CYANOTIPOS, MUSEOS, RADIOGRAFIAS, XRAY_OSCURO
+from ._comun import (CETI, COOL_OBJETOS, CYANOTIPO_TONES, CYANOTIPO_TRANSPARENT,
+                     CYANOTIPOS, GRAFICAS, MASCOTAS, MUSEOS, PROTAGONISTA,
+                     RADIOGRAFIAS)
 
 CONFIG = {
     "output": "wallpapers/alineada",
@@ -24,8 +36,9 @@ CONFIG = {
     "seed": 1843,
 
     "background": {"solid": "#f2efe8",
-                   "stain": {"amount": 0.3, "scale": 0.5, "color": "#ddd6c6"}},
-    "layers": {"min": 9, "max": 14},
+                   "stain": {"amount": 0.55, "scale": 0.4, "threshold": 0.35,
+                            "color": "#c9beac"}},
+    "layers": {"min": 11, "max": 16},
     "layout": {"mode": "align", "width": 0.92, "gap": 2, "anchor": "center",
               "size": [0.14, 0.24]},
     "finish": {"grain": 0.03},
@@ -42,10 +55,27 @@ CONFIG = {
     },
 
     "sources": [
+        # La protagonista: bastante más grande que el resto del bloque.
+        {"src": PROTAGONISTA, "tones": {"normalize": True, "invert": True},
+         "resize": {"size": [0.42, 0.42], "mode": "fit"},
+         "stain": {"amount": 0.18, "scale": 0.4, "threshold": 0.45}},
+
         {"src": RADIOGRAFIAS, "tones": {"normalize": True, "invert": True}},
         {"src": CYANOTIPOS, "tones": CYANOTIPO_TONES,
          "transparent": CYANOTIPO_TRANSPARENT},
+
+        # Gráficas repetidas sobre sí mismas antes de entrar al bloque.
+        *[{"src": g, "repeat": {"step": [0, 0.5], "times": 2, "mirror": True}}
+          for g in GRAFICAS],
+
+        # Una textura por mosaico, para variar la escala del detalle.
+        {"src": f"{MUSEOS}/wall.JPG", "mosaic": {"grid": [2, 2], "mirror": True},
+         "resize": {"size": [0.2, 0.2], "mode": "fit"}},
+
         MUSEOS,
+        MASCOTAS,
+        CETI,
+        *COOL_OBJETOS,
     ],
 }
 

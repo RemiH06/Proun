@@ -58,3 +58,14 @@ ACENTOS_COLOR = [
     "fuentes2/Cool pics/fridge_heat.png",
     "fuentes2/Cool pics/fridge_inkbloom.png",
 ]
+
+# Piezas de "Cool pics" que se comportan como objeto (fondo relativamente
+# plano) y no como paisaje. Es una conjetura por nombre, ajústala cuando
+# veas cómo se portan de verdad.
+COOL_OBJETOS = [f"{COOL}/{n}.jpg" for n in
+                ("hand", "glasses", "stick", "bug_clips", "rooster", "drawing",
+                 "homework", "makeup")]
+
+# Una pieza que se sale del tamaño normal y ancla la composición. En modo
+# align sigue empaquetándose con las demás, solo que ocupa más sitio.
+PROTAGONISTA = f"{BIO}/smalltoothsawfish.png"
