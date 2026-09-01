@@ -37,9 +37,12 @@ CONFIG = {
     # --- cómo se compone ---------------------------------------------------
     # "layers": {"min": 4, "max": 7},    # cuántas imágenes por collage
     "layout": {
-        "mode": "scatter",       # scatter, free, grid, row, column, stack
-        "bleed": 0.12,           # cuánto pueden salirse del borde
+        "mode": "scatter",       # scatter, free, grid, row, column, stack, align
+        "bleed": 0.12,           # cuánto pueden salirse del borde (no aplica a align)
         "size": [0.38, 0.82],    # fracción del lienzo por capa sin resize propio
+        # "width": 0.92,         # solo align: ancho del bloque, fracción del lienzo
+        # "gap": 2,              # solo align: separación entre piezas, en píxeles
+        # "anchor": "center",    # solo align: top, center o bottom
     },
     "background": "auto",        # "auto", None, un color, o {"gradient": [...]}
     # "finish": {"vignette": 0.3, "grain": 0.05, "contrast": 1.05},

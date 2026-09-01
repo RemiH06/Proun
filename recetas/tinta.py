@@ -9,7 +9,8 @@ sujeto aislado sobre fondo claro.
 
 from proun.cli import main
 
-from ._comun import CLARAS, GRAFICAS, MUSEOS, RADIOGRAFIAS, XRAY_OSCURO
+from ._comun import (CLARAS, CYANOTIPO_TONES, CYANOTIPO_TRANSPARENT, CYANOTIPOS, GRAFICAS, MUSEOS,
+                     RADIOGRAFIAS, XRAY_OSCURO)
 
 CONFIG = {
     "output": "wallpapers/tinta",
@@ -44,6 +45,8 @@ CONFIG = {
          "repeat": {"step": [0.58, 0], "times": 1, "mirror": True,
                     "blend": "multiply"},
          "stain": {"amount": 0.4, "scale": 0.35, "edges": 0.6}},
+        {"src": CYANOTIPOS, "tones": CYANOTIPO_TONES,
+         "transparent": CYANOTIPO_TRANSPARENT},
     ] + CLARAS + [
         # Las gráficas entran repetidas sobre sí mismas, como las barras del
         # fondo de referencia.

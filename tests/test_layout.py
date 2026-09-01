@@ -177,10 +177,124 @@ class Sangrado(unittest.TestCase):
         self.assertEqual(layout.clamp((0, 0), (1200, 700), (1000, 500), (0, 0)), (-100, -100))
 
 
+class Empaquetado(unittest.TestCase):
+    def rects_no_solapan(self, posiciones, sizes):
+        rects = list(zip(posiciones, sizes))
+        for i in range(len(rects)):
+            (ax, ay), (aw, ah) = rects[i]
+            for j in range(i + 1, len(rects)):
+                (bx, by), (bw, bh) = rects[j]
+                solapan = not (ax + aw <= bx or bx + bw <= ax or ay + ah <= by or by + bh <= ay)
+                self.assertFalse(solapan, (i, j))
+
+    def test_vacio(self):
+        self.assertEqual(layout.pack([], 500), ([], (0, 0)))
+
+    def test_una_pieza_queda_en_el_origen(self):
+        posiciones, bloque = layout.pack([(100, 60)], 500)
+        self.assertEqual(posiciones, [(0, 0)])
+        self.assertEqual(bloque, (100, 60))
+
+    def test_sin_solapes_con_muchas_piezas(self):
+        r = random.Random(3)
+        sizes = [(r.randint(20, 200), r.randint(20, 200)) for _ in range(25)]
+        posiciones, _ = layout.pack(sizes, 700)
+        self.rects_no_solapan(posiciones, sizes)
+
+    def test_sin_solapes_barrido_de_semillas(self):
+        for semilla in range(60):
+            r = random.Random(semilla)
+            n = r.randint(1, 15)
+            sizes = [(r.randint(20, 250), r.randint(20, 250)) for _ in range(n)]
+            posiciones, _ = layout.pack(sizes, r.randint(150, 800), gap=r.choice([0, 2, 5]))
+            self.rects_no_solapan(posiciones, sizes)
+
+    def test_nada_se_sale_del_ancho_pedido(self):
+        # Salvo la pieza que de por sí es más ancha que el pedido.
+        sizes = [(80, 40)] * 10
+        posiciones, bloque = layout.pack(sizes, 300)
+        self.assertTrue(all(x + 80 <= 300 for x, _ in posiciones))
+        self.assertLessEqual(bloque[0], 300)
+
+    def test_pieza_mas_ancha_que_el_pedido_no_se_recorta(self):
+        posiciones, bloque = layout.pack([(500, 50)], 200)
+        self.assertEqual(bloque[0], 500)
+
+    def test_gap_separa_las_piezas(self):
+        junto = layout.pack([(100, 50), (100, 50)], 300, gap=0)[0]
+        separado = layout.pack([(100, 50), (100, 50)], 300, gap=10)[0]
+        self.assertNotEqual(junto, separado)
+
+    def test_es_determinista(self):
+        sizes = [(80, 40), (60, 90), (120, 30)]
+        self.assertEqual(layout.pack(sizes, 300), layout.pack(sizes, 300))
+
+    def test_el_orden_importa(self):
+        sizes = [(80, 40), (60, 90), (120, 30)]
+        a, _ = layout.pack(sizes, 300)
+        b, _ = layout.pack(list(reversed(sizes)), 300)
+        self.assertNotEqual(a, list(reversed(b)))
+
+    def test_bloque_es_la_caja_que_contiene_todo(self):
+        sizes = [(80, 40), (60, 90), (120, 30), (50, 50)]
+        posiciones, bloque = layout.pack(sizes, 300)
+        for (x, y), (w, h) in zip(posiciones, sizes):
+            self.assertLessEqual(x + w, bloque[0])
+            self.assertLessEqual(y + h, bloque[1])
+
+
+class Centrado(unittest.TestCase):
+    def test_centra_horizontal_siempre(self):
+        x, _ = layout.center_block((200, 100), (1000, 500), "top")
+        self.assertEqual(x, 400)
+
+    def test_top(self):
+        self.assertEqual(layout.center_block((200, 100), (1000, 500), "top"), (400, 0))
+
+    def test_bottom(self):
+        self.assertEqual(layout.center_block((200, 100), (1000, 500), "bottom"), (400, 400))
+
+    def test_center(self):
+        self.assertEqual(layout.center_block((200, 100), (1000, 500), "center"), (400, 200))
+
+    def test_ancla_invalida(self):
+        with self.assertRaises(SpecError):
+            layout.center_block((200, 100), (1000, 500), "izquierda")
+
+
+class OpcionesDeEmpaquetado(unittest.TestCase):
+    def test_defaults(self):
+        self.assertEqual(layout.pack_options({}), (0.94, 0, "center"))
+
+    def test_valores_explicitos(self):
+        self.assertEqual(layout.pack_options({"width": 0.8, "gap": 4, "anchor": "top"}),
+                         (0.8, 4, "top"))
+
+    def test_width_fuera_de_rango(self):
+        for malo in (0, 1.5, -0.2, "mucho"):
+            with self.assertRaises(SpecError, msg=malo):
+                layout.pack_options({"width": malo})
+
+    def test_gap_invalido(self):
+        for malo in (-1, 2.5, "poco", True):
+            with self.assertRaises(SpecError, msg=malo):
+                layout.pack_options({"gap": malo})
+
+
 class Validacion(unittest.TestCase):
     def test_clave_desconocida(self):
         with self.assertRaises(SpecError):
             layout.positions(3, rng(), {"modo": "scatter"})
+
+    def test_align_no_consume_el_generador(self):
+        # El centro es un relleno: la posición real sale de compose._pack.
+        estado_antes = rng(5).getstate()
+        r = rng(5)
+        layout.positions(4, r, {"mode": "align"})
+        self.assertEqual(r.getstate(), estado_antes)
+
+    def test_align_da_centros_constantes(self):
+        self.assertEqual(layout.positions(3, rng(), {"mode": "align"}), [(0.5, 0.5)] * 3)
 
     def test_modo_invalido(self):
         with self.assertRaises(SpecError):

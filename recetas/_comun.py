@@ -34,3 +34,27 @@ ROCAS = f"{COOL}/rocks*.jpg"
 # blanco se necesita lo contrario.
 XRAY_CLARO = {"normalize": True, "gamma": 1.6}
 XRAY_OSCURO = {"normalize": True, "invert": True, "cutoff": 1}
+
+# --- Cianotipos de Higgsfield -------------------------------------------
+# Ya vienen como fotograma: sujeto aislado, alto contraste, borde de papel
+# real. Con dominant "light" el papel desaparece limpio y el sujeto queda
+# de tinta sólida, igual que las radiografías. Entran al pipeline normal y
+# se recolorean al color del lote, no conservan su azul nativo.
+CYANOTIPOS = [
+    "fuentes2/Bio/snail_cyanotype.png",
+    "fuentes2/Mascotas/billz1_cyanotype.png",
+    "fuentes2/Cool pics/fridge_cyanotype.png",
+]
+CYANOTIPO_TONES = {"normalize": True, "cutoff": 2, "dominant": "light"}
+# El papel del cianotipo es más irregular que una foto de museo ya duotono, y
+# necesita más margen para despejarse del todo.
+CYANOTIPO_TRANSPARENT = {"color": "light", "tolerance": 0.06, "softness": 0.55}
+
+# Multicolor de verdad: mapa térmico y salpicadura de tinta. Rompen a
+# propósito la unidad de paleta, así que van sin recolor y con opacidad baja,
+# como acento suelto. No se usan en tinta/vitrina/alineada, que dependen de
+# que todo comparta un color.
+ACENTOS_COLOR = [
+    "fuentes2/Cool pics/fridge_heat.png",
+    "fuentes2/Cool pics/fridge_inkbloom.png",
+]

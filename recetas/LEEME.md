@@ -7,6 +7,7 @@ python -m recetas.tinta
 python -m recetas.vitrina
 python -m recetas.reticula
 python -m recetas.mezcla
+python -m recetas.alineada
 ```
 
 Las banderas siguen funcionando encima, que es la manera de iterar rápido:
@@ -33,6 +34,12 @@ el material de archivo. Los esqueletos van espejados sobre sí mismos.
 **reticula** es la constructivista. Cuadrícula, giros de un cuarto de vuelta,
 color fuerte y un acento que no sigue al color del lote. Es la que mejor aguanta
 fotos con fondo, porque no depende de aislar el sujeto.
+
+**alineada** es el registro más cercano al fondo de referencia: piezas que se
+tocan entre sí formando una banda irregular, con papel vacío arriba y abajo.
+Usa `layout.mode = "align"`. La clave para que se vea como banda y no como
+pared es un `layout.size` bajo (aquí 0.14 a 0.24); con piezas grandes el bloque
+crece más alto que el lienzo y se recorta arriba y abajo.
 
 **mezcla** es la pensada para cuando estén todas las carpetas. Cada origen entra
 con un tratamiento distinto para que se distingan sin dejar de compartir paleta.

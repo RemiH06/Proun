@@ -235,6 +235,93 @@ class CapaDeFondo(unittest.TestCase):
         self.assertEqual(nombres, ["b.png", "c.png"])
 
 
+class ModoAlinear(unittest.TestCase):
+    def config(self, **extra):
+        return spec.build({
+            "sources": [str(FUENTES / "a.png"), str(FUENTES / "b.png"), str(FUENTES / "c.png")],
+            "resolutions": ["800x450"], "colors": [AZUL], "seeds": [4],
+            "layout": {"mode": "align"}, "background": None,
+            **extra,
+        })
+
+    def posiciones(self, base, resolution=(800, 450), seed=4):
+        shaped = compose.prepare(base, compose.plan(base, seed), resolution)
+        return [s.position for s in shaped]
+
+    def test_asigna_una_posicion_a_cada_capa(self):
+        self.assertTrue(all(p is not None for p in self.posiciones(self.config())))
+
+    def test_no_se_solapan(self):
+        base = self.config(layers=3)
+        shaped = compose.prepare(base, compose.plan(base, 4), (800, 450))
+        rects = [(s.position, s.tonal.size) for s in shaped]
+        for i in range(len(rects)):
+            (ax, ay), (aw, ah) = rects[i]
+            for j in range(i + 1, len(rects)):
+                (bx, by), (bw, bh) = rects[j]
+                solapan = not (ax + aw <= bx or bx + bw <= ax or ay + ah <= by or by + bh <= ay)
+                self.assertFalse(solapan, (i, j))
+
+    def test_es_determinista(self):
+        base = self.config()
+        self.assertEqual(self.posiciones(base), self.posiciones(base))
+
+    def test_una_capa_cover_no_entra_al_bloque(self):
+        base = spec.build({
+            "sources": [{"src": str(FUENTES / "a.png"), "cover": True},
+                       str(FUENTES / "b.png"), str(FUENTES / "c.png")],
+            "resolutions": ["800x450"], "colors": [AZUL], "seeds": [4],
+            "layout": {"mode": "align"},
+        })
+        shaped = compose.prepare(base, compose.plan(base, 4), (800, 450))
+        self.assertIsNone(shaped[0].position)
+        self.assertIsNotNone(shaped[1].position)
+
+    def test_position_explicita_no_entra_al_bloque(self):
+        base = spec.build({
+            "sources": [{"src": str(FUENTES / "a.png"), "position": [10, 10]},
+                       str(FUENTES / "b.png")],
+            "resolutions": ["800x450"], "colors": [AZUL], "seeds": [4],
+            "layout": {"mode": "align"}, "background": None,
+        })
+        plan = compose.plan(base, 4)
+        shaped = compose.prepare(base, plan, (800, 450))
+        # El plan revuelve el orden, así que se busca por contenido, no por índice.
+        con_position = [s for p, s in zip(plan.placements, shaped) if p.layer.position is not None]
+        sin_position = [s for p, s in zip(plan.placements, shaped) if p.layer.position is None]
+        self.assertTrue(all(s.position is None for s in con_position))
+        self.assertTrue(all(s.position is not None for s in sin_position))
+        salida = compose.render(base, plan, (800, 450), AZUL)
+        self.assertNotEqual(salida.getpixel((15, 15))[3], 0)
+
+    def test_region_explicita_no_entra_al_bloque(self):
+        base = spec.build({
+            "sources": [{"src": str(FUENTES / "a.png"), "region": "topleft"},
+                       str(FUENTES / "b.png")],
+            "resolutions": ["800x450"], "colors": [AZUL], "seeds": [4],
+            "layout": {"mode": "align"},
+        })
+        plan = compose.plan(base, 4)
+        shaped = compose.prepare(base, plan, (800, 450))
+        con_region = [s for p, s in zip(plan.placements, shaped) if p.layer.region is not None]
+        self.assertTrue(all(s.position is None for s in con_region))
+
+    def test_el_ancho_del_bloque_respeta_layout_width(self):
+        base = self.config(layers=3, layout={"mode": "align", "width": 0.5})
+        shaped = compose.prepare(base, compose.plan(base, 4), (800, 450))
+        derecha = max(s.position[0] + s.tonal.width for s in shaped)
+        # El bloque puede quedar más angosto que el pedido, pero no mucho más ancho.
+        self.assertLessEqual(derecha, 800)
+
+    def test_render_no_truena_sin_capas_empaquetables(self):
+        base = spec.build({
+            "sources": [{"src": str(FUENTES / "a.png"), "cover": True}],
+            "resolutions": ["800x450"], "colors": [AZUL], "seeds": [4],
+            "layout": {"mode": "align"},
+        })
+        self.assertIsNotNone(compose.render(base, compose.plan(base, 4), (800, 450), AZUL))
+
+
 class RegionSangradoYColor(unittest.TestCase):
     def config(self, **extra):
         return spec.build({

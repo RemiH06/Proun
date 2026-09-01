@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PIL import Image
@@ -96,6 +96,7 @@ class Shaped:
 
     tonal: Image.Image
     source: Image.Image | None
+    position: tuple[int, int] | None = None
 
 
 def prepare(spec: Spec, current: Plan, resolution: tuple[int, int]) -> tuple[Shaped, ...]:
@@ -106,10 +107,39 @@ def prepare(spec: Spec, current: Plan, resolution: tuple[int, int]) -> tuple[Sha
     """
     measure_canvas = spec.reference if spec.scale_with_resolution else resolution
     scale = _scale(spec, resolution)
-    return tuple(
+    shaped = tuple(
         _shape_layer(placement, measure_canvas, scale, resolution, current.seed, indice)
         for indice, placement in enumerate(current.placements)
     )
+    if str(spec.layout.get("mode", "")).lower() == "align":
+        shaped = _pack(shaped, current.placements, resolution, spec.layout)
+    return shaped
+
+
+def _pack(shaped: tuple[Shaped, ...], placements: tuple[Placement, ...],
+          resolution: tuple[int, int], layout_spec: dict) -> tuple[Shaped, ...]:
+    """Acomoda en estantería las capas que no tienen colocación manual propia.
+
+    Se excluyen las capas `cover` (van al fondo, no al bloque) y cualquiera con
+    `position` o `region` explícitos: esas ya tienen instrucciones concretas de
+    dónde ir, y mezclarlas con el empaquetado no tiene una semántica clara.
+    """
+    indices = [
+        i for i, p in enumerate(placements)
+        if not p.layer.cover and p.layer.position is None and p.layer.region is None
+    ]
+    if not indices:
+        return shaped
+
+    width_frac, gap, anchor = layout.pack_options(layout_spec)
+    sizes = [shaped[i].tonal.size for i in indices]
+    posiciones, bloque = layout.pack(sizes, round(resolution[0] * width_frac), gap)
+    offset = layout.center_block(bloque, resolution, anchor)
+
+    resultado = list(shaped)
+    for (x, y), i in zip(posiciones, indices):
+        resultado[i] = replace(shaped[i], position=(offset[0] + x, offset[1] + y))
+    return tuple(resultado)
 
 
 def render(spec: Spec, current: Plan, resolution: tuple[int, int], main,
@@ -129,6 +159,8 @@ def render(spec: Spec, current: Plan, resolution: tuple[int, int], main,
             raise SourceError(f"falló el recoloreado de {layer.src.name}: {exc}") from exc
         if layer.cover:
             position = (0, 0)
+        elif base.position is not None:
+            position = base.position
         elif placement.layer.position is not None:
             position = layout.explicit(
                 placement.layer.position, tile.size, resolution, placement.layer.anchor

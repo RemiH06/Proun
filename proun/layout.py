@@ -23,7 +23,7 @@ import random
 from .errors import SpecError
 from .geometry import anchor_factors, measure
 
-MODES = ("scatter", "free", "grid", "row", "column", "stack")
+MODES = ("scatter", "free", "grid", "row", "column", "stack", "align")
 
 
 def positions(count: int, rng: random.Random, spec=None) -> list[tuple[float, float]]:
@@ -35,7 +35,7 @@ def positions(count: int, rng: random.Random, spec=None) -> list[tuple[float, fl
     if spec is not None and not isinstance(spec, dict):
         raise SpecError(f"layout debe ser un objeto, llegó {spec!r}")
     spec = dict(spec or {})
-    unknown = set(spec) - {"mode", "bleed", "jitter", "shuffle", "size"}
+    unknown = set(spec) - {"mode", "bleed", "jitter", "shuffle", "size"} - PACK_KEYS
     if unknown:
         raise SpecError(f"claves desconocidas en layout: {sorted(unknown)}")
 
@@ -45,6 +45,11 @@ def positions(count: int, rng: random.Random, spec=None) -> list[tuple[float, fl
     bleed = _unit(spec.get("bleed", 0.12), "layout.bleed", high=1.0)
     jitter = _unit(spec.get("jitter", 0.12), "layout.jitter", high=1.0)
 
+    if mode == "align":
+        # La posición real se calcula después, en compose.prepare, porque
+        # depende del tamaño en píxeles de cada capa y eso todavía no se
+        # conoce aquí. No consume el generador: no hay nada que sortear.
+        return [(0.5, 0.5)] * count
     if mode == "free":
         return [
             (rng.uniform(-bleed, 1 + bleed), rng.uniform(-bleed, 1 + bleed))
@@ -162,6 +167,125 @@ def clamp(position, size, canvas, bleed) -> tuple[int, int]:
         else:
             salida.append(min(max(position[eje], minimo), maximo))
     return (salida[0], salida[1])
+
+
+PACK_KEYS = {"width", "gap", "anchor"}
+PACK_ANCHORS = ("top", "center", "bottom")
+
+
+def pack(sizes, width: int, gap: int = 0):
+    """Coloca rectángulos sin solaparse con skyline bottom-left.
+
+    Cada pieza cae en el hueco más alto disponible dentro de `width`, tocando a
+    sus vecinas por los lados y por abajo, como una estantería. `sizes` va en
+    el orden en que deben colocarse; normalmente ya viene revuelto por la
+    semilla, y ese orden es lo único de lo que depende el resultado, así que es
+    determinista sin tocar el generador aleatorio.
+
+    Una pieza más ancha que `width` no se recorta: se le da su propio ancho de
+    contenedor, así que el bloque final puede terminar más ancho de lo pedido.
+
+    Devuelve las esquinas superiores izquierdas en el mismo orden que `sizes`,
+    y el tamaño del bloque que las contiene a todas.
+    """
+    if not sizes:
+        return [], (0, 0)
+    ancho = max(width, max(w for w, _ in sizes)) + gap
+    skyline = [[0, ancho, 0]]  # segmentos contiguos [x, ancho, y]
+
+    posiciones = []
+    for w, h in sizes:
+        # Se reserva w+gap y h+gap, pero la pieza se dibuja en el mismo punto:
+        # así el hueco queda a la derecha y abajo de cada pieza, no alrededor.
+        x, y, idx = _best_fit(skyline, w + gap, ancho)
+        posiciones.append((x, y))
+        _place(skyline, x, w + gap, y + h + gap)
+
+    block_w = max(x + w for (x, _), (w, _h) in zip(posiciones, sizes))
+    block_h = max(y + h for (_, y), (_w, h) in zip(posiciones, sizes))
+    return posiciones, (block_w, block_h)
+
+
+def _best_fit(skyline, w: int, ancho: int):
+    """El punto más alto (menor y) donde cabe un ancho w; a igualdad, el más a la izquierda."""
+    mejor_y = None
+    mejor_x = None
+    mejor_indice = None
+    for i in range(len(skyline)):
+        x0 = skyline[i][0]
+        if x0 + w > ancho:
+            continue
+        y = 0
+        cubierto = 0
+        j = i
+        while cubierto < w and j < len(skyline):
+            y = max(y, skyline[j][2])
+            cubierto += skyline[j][1]
+            j += 1
+        if cubierto < w:
+            continue
+        if mejor_y is None or y < mejor_y or (y == mejor_y and x0 < mejor_x):
+            mejor_y, mejor_x, mejor_indice = y, x0, i
+    if mejor_x is None:
+        # No debería pasar: `ancho` se calculó para que la pieza más ancha quepa.
+        raise SpecError(f"no se encontró lugar para una pieza de {w}px en un bloque de {ancho}px")
+    return mejor_x, mejor_y, mejor_indice
+
+
+def _place(skyline, x: int, w: int, y: int) -> None:
+    """Inserta un segmento nuevo en [x, x+w) a altura y, recortando lo que tapa."""
+    nuevo = []
+    for seg_x, seg_w, seg_y in skyline:
+        seg_end, x_end = seg_x + seg_w, x + w
+        if seg_end <= x or seg_x >= x_end:
+            nuevo.append([seg_x, seg_w, seg_y])
+            continue
+        if seg_x < x:
+            nuevo.append([seg_x, x - seg_x, seg_y])
+        if seg_end > x_end:
+            nuevo.append([x_end, seg_end - x_end, seg_y])
+    nuevo.append([x, w, y])
+    nuevo.sort(key=lambda s: s[0])
+    # Fusiona segmentos vecinos con la misma altura, para que la lista no crezca sin fin.
+    fusionado = [nuevo[0]]
+    for seg in nuevo[1:]:
+        anterior = fusionado[-1]
+        if anterior[2] == seg[2] and anterior[0] + anterior[1] == seg[0]:
+            anterior[1] += seg[1]
+        else:
+            fusionado.append(seg)
+    skyline[:] = fusionado
+
+
+def center_block(block_size, canvas, anchor="center") -> tuple[int, int]:
+    """Esquina donde colocar un bloque ya empaquetado para centrarlo en el lienzo.
+
+    Horizontal siempre al centro. Vertical según `anchor`: top, center o bottom,
+    que es lo que deja la banda de papel vacío arriba y abajo o la empuja hacia
+    un lado.
+    """
+    if anchor not in PACK_ANCHORS:
+        raise SpecError(f"layout.anchor debe ser uno de {PACK_ANCHORS}, llegó {anchor!r}")
+    x = round((canvas[0] - block_size[0]) / 2)
+    if anchor == "top":
+        y = 0
+    elif anchor == "bottom":
+        y = canvas[1] - block_size[1]
+    else:
+        y = round((canvas[1] - block_size[1]) / 2)
+    return (x, y)
+
+
+def pack_options(spec: dict) -> tuple[float, int, str]:
+    """Lee width, gap y anchor del layout, con sus valores por defecto."""
+    width = spec.get("width", 0.94)
+    if isinstance(width, bool) or not isinstance(width, (int, float)) or not 0 < width <= 1:
+        raise SpecError(f"layout.width debe estar entre 0 y 1, llegó {width!r}")
+    gap = spec.get("gap", 0)
+    if isinstance(gap, bool) or not isinstance(gap, int) or gap < 0:
+        raise SpecError(f"layout.gap debe ser un entero no negativo, llegó {gap!r}")
+    anchor = str(spec.get("anchor", "center")).lower()
+    return (float(width), gap, anchor)
 
 
 def _unit(value, name, high=1.0) -> float:
