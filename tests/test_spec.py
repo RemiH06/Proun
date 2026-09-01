@@ -285,6 +285,46 @@ class Figuras(unittest.TestCase):
         self.assertEqual(tipos, {True, False})
 
 
+class Textos(unittest.TestCase):
+    def test_un_texto_no_necesita_src(self):
+        config = spec.build(base(sources=[{"text": "PROUN"}]))
+        self.assertIsNone(config.sources[0].src)
+        self.assertEqual(config.sources[0].text, "PROUN")
+
+    def test_texto_como_objeto_completo(self):
+        valor = {"text": "PROUN", "weight": "bold", "wrap": 0.5}
+        config = spec.build(base(sources=[{"text": valor}]))
+        self.assertEqual(config.sources[0].text, valor)
+
+    def test_tres_tipos_son_excluyentes_entre_si(self):
+        for combo in (
+            {"text": "PROUN", "src": str(FUENTES / "a.png")},
+            {"text": "PROUN", "shape": "circle"},
+            {"shape": "circle", "src": str(FUENTES / "a.png")},
+        ):
+            with self.assertRaises(SpecError, msg=combo):
+                spec.build(base(sources=[combo]))
+
+    def test_sin_ninguno_de_los_tres(self):
+        with self.assertRaises(SpecError):
+            spec.build(base(sources=[{"opacity": 0.5}]))
+
+    def test_copies_funciona_igual(self):
+        config = spec.build(base(sources=[{"text": "PROUN", "copies": 3}]))
+        self.assertEqual(len(config.sources), 3)
+
+    def test_hereda_defaults(self):
+        config = spec.build(base(defaults={"opacity": 0.6},
+                                 sources=[{"text": "PROUN"}]))
+        self.assertEqual(config.sources[0].opacity, 0.6)
+
+    def test_convive_con_fotos_y_figuras(self):
+        config = spec.build(base(sources=[
+            {"text": "PROUN"}, {"shape": "circle"}, str(FUENTES / "a.png"),
+        ]))
+        self.assertEqual(len(config.sources), 3)
+
+
 class RateYOverlap(unittest.TestCase):
     def test_rate_por_defecto_es_uno(self):
         self.assertEqual(spec.build(base(sources=[{"shape": "circle"}])).sources[0].rate, 1.0)

@@ -20,7 +20,7 @@ LAYER_KEYS = {
     "src", "crop", "resize", "mosaic", "rotate", "stain", "tones", "transparent",
     "recolor", "color",
     "opacity", "blend", "position", "anchor", "region", "bleed", "copies",
-    "repeat", "cover", "shape", "outline", "rate", "overlap",
+    "repeat", "cover", "shape", "outline", "rate", "overlap", "text",
 }
 
 SPEC_KEYS = {
@@ -39,6 +39,7 @@ class Layer:
     src: Path | None = None
     shape: object = None
     outline: dict = field(default_factory=dict)
+    text: object = None
     crop: object = None
     resize: object = None
     mosaic: object = None
@@ -344,12 +345,14 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
         unknown = set(entry) - LAYER_KEYS
         if unknown:
             raise SpecError(f"claves desconocidas en una imagen: {sorted(unknown)}")
-        if "src" in entry and "shape" in entry:
-            raise SpecError(f"una capa es imagen o figura, no las dos: {entry!r}")
-        if "src" not in entry and "shape" not in entry:
-            raise SpecError(f"a esta imagen le falta 'src' o 'shape': {entry!r}")
+        tipos = {"src", "shape", "text"} & set(entry)
+        if len(tipos) > 1:
+            raise SpecError(f"una capa es imagen, figura o texto, no varias a la vez: {entry!r}")
+        if not tipos:
+            raise SpecError(f"a esta capa le falta 'src', 'shape' o 'text': {entry!r}")
 
-        merged = {**defaults, **{k: v for k, v in entry.items() if k not in ("src", "shape")}}
+        merged = {**defaults,
+                 **{k: v for k, v in entry.items() if k not in ("src", "shape", "text")}}
         copies = merged.pop("copies", 1)
         if not isinstance(copies, int) or isinstance(copies, bool) or not 1 <= copies <= 500:
             raise SpecError(f"copies debe ser un entero entre 1 y 500, llegó {copies!r}")
@@ -404,6 +407,14 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
                 raise SpecError(f"outline debe ser un objeto, llegó {outline!r}")
             for _ in range(copies):
                 layers.append(Layer(shape=entry["shape"], outline=dict(outline), **comun))
+            continue
+
+        if "text" in entry:
+            # Igual que una figura: no hay archivo que expandir, y el detalle
+            # de fuente/alineado/contorno se valida más tarde, en ops.text,
+            # como el resto de las operaciones (crop, resize, mosaic...).
+            for _ in range(copies):
+                layers.append(Layer(text=entry["text"], **comun))
             continue
 
         paths = loading.expand(entry["src"])

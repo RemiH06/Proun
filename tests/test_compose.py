@@ -367,6 +367,67 @@ class Figuras(unittest.TestCase):
         self.assertEqual(a.tobytes(), b.tobytes())
 
 
+class Textos(unittest.TestCase):
+    def config(self, **extra):
+        return spec.build({
+            "sources": [{"text": "PROUN"}], "resolutions": ["400x300"],
+            "colors": [AZUL], "seeds": [3], "background": "#101010",
+            **extra,
+        })
+
+    def test_se_genera_y_renderiza(self):
+        base = self.config()
+        salida = compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        self.assertEqual(salida.size, (400, 300))
+
+    def test_hereda_el_color_del_lote(self):
+        base = self.config()
+        rojo = compose.render(base, compose.plan(base, 3), (400, 300), "#ff0000")
+        azul = compose.render(base, compose.plan(base, 3), (400, 300), "#0000ff")
+        self.assertNotEqual(rojo.tobytes(), azul.tobytes())
+
+    def test_una_lista_de_textos_se_sortea_por_capa(self):
+        base = self.config(sources=[{"text": ["UNO", "DOS", "TRES", "CUATRO"]}])
+        elegidos = {compose.plan(base, s).placements[0].text for s in range(20)}
+        self.assertGreater(len(elegidos), 1)
+        self.assertTrue(elegidos <= {"UNO", "DOS", "TRES", "CUATRO"})
+
+    def test_lista_de_textos_anidada_en_un_objeto(self):
+        base = self.config(sources=[
+            {"text": {"text": ["UNO", "DOS", "TRES"], "weight": "regular"}}
+        ])
+        elegidos = set()
+        for s in range(20):
+            resuelto = compose.plan(base, s).placements[0].text
+            self.assertEqual(resuelto["weight"], "regular")
+            elegidos.add(resuelto["text"])
+        self.assertGreater(len(elegidos), 1)
+
+    def test_es_reproducible_incluida_la_eleccion_de_texto(self):
+        base = self.config(sources=[{"text": ["UNO", "DOS", "TRES"]}])
+        plan = compose.plan(base, 7)
+        a = compose.render(base, plan, (400, 300), AZUL)
+        b = compose.render(base, plan, (400, 300), AZUL)
+        self.assertEqual(a.tobytes(), b.tobytes())
+
+    def test_convive_con_fotos_y_figuras(self):
+        base = self.config(sources=[{"text": "PROUN"}, {"shape": "circle"},
+                                    str(FUENTES / "a.png")])
+        salida = compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        self.assertIsNotNone(salida)
+
+    def test_error_menciona_el_texto_no_un_archivo(self):
+        base = self.config(sources=[{"text": {"text": "PROUN", "wrap": 5}}])
+        with self.assertRaises(SourceError) as caso:
+            compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        self.assertIn("texto", str(caso.exception))
+
+    def test_rate_y_overlap_tambien_sirven_para_texto(self):
+        base = self.config(sources=[{"text": "PROUN", "rate": 0.0}])
+        apariciones = [len(compose.plan(base, s).placements) for s in range(20)]
+        self.assertTrue(all(n == 0 for n in apariciones))
+
+
 class RateYOverlapEnElPlan(unittest.TestCase):
     def config(self, **extra):
         return spec.build({

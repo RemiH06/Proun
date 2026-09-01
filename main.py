@@ -77,6 +77,28 @@ CONFIG = {
 #     "copies": 4,
 # }
 
+# Un texto en vez de una foto o una figura: sin "src" ni "shape", con "text".
+# Igual que las figuras, sale en escala de grises y hereda el recolor del
+# lote. La fuente viene empaquetada (Big Shoulders, OFL) y cubre acentos,
+# diéresis y ñ; para otro alfabeto hay que dar una ruta propia con "font".
+#
+# {
+#     "text": "PROUN",                     # o una lista: sortea una por wallpaper
+#     "text": {
+#         "text": ["PROUN", "1926", "CONSTRUCTIVISMO"],
+#         "weight": "bold",                # bold o regular; ignorado si hay "font"
+#         # "font": "C:/ruta/a/una.ttf",
+#         "align": "center",                # left, center, right
+#         "wrap": 0.6,                      # ancho antes de saltar de línea; sin
+#                                            # esto, todo en una sola línea
+#         "line_spacing": 1.15,
+#         "outline": {"width": 0.04},       # se traza en el borde real del glifo,
+#     },                                    # no hacia adentro como en las figuras
+#     "color": ["#e0504a", "#4a9de0"],
+#     "opacity": 0.9,
+#     "rate": 0.7,
+# }
+
 # Una capa con todos sus ajustes, por si hace falta copiarla a "sources":
 #
 # {

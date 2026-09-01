@@ -19,7 +19,7 @@ from PIL import Image
 from . import colors, layout, loading
 from .errors import SourceError, SpecError
 from .ops import (background, blend, crop, finish, mosaic, recolor, repeat, resize,
-                  rotate, shapes, stain, tones, transparency)
+                  rotate, shapes, stain, text as text_op, tones, transparency)
 from .spec import Layer, Spec
 
 
@@ -31,6 +31,7 @@ class Placement:
     center: tuple[float, float]
     fill: float
     color: object = None
+    text: object = None
 
 
 @dataclass(frozen=True)
@@ -54,7 +55,8 @@ def plan(spec: Spec, seed: int) -> Plan:
 
     placements = [
         Placement(layer=layer, angle=angle, flip=flip, center=(0.5, 0.5), fill=1.0,
-                  color=_choose_color(layer.color, rng))
+                  color=_choose(layer.color, rng, "colores"),
+                  text=_choose_text(layer.text, rng))
         for layer, (angle, flip) in zip(covers, [rotate.decide(c.rotate, rng) for c in covers])
     ]
     turns = [rotate.decide(layer.rotate, rng) for layer in resto]
@@ -64,7 +66,8 @@ def plan(spec: Spec, seed: int) -> Plan:
     placements += [
         Placement(layer=layer, angle=angle, flip=flip,
                   center=_region_center(center, layer.region), fill=fill,
-                  color=_choose_color(layer.color, rng))
+                  color=_choose(layer.color, rng, "colores"),
+                  text=_choose_text(layer.text, rng))
         for layer, (angle, flip), center, fill in zip(resto, turns, centers, fills)
     ]
     return Plan(seed=seed, placements=tuple(placements))
@@ -140,13 +143,25 @@ def _region_center(center, region):
     return (x0 + dentro[0] * (x1 - x0), y0 + dentro[1] * (y1 - y0))
 
 
-def _choose_color(color, rng: random.Random):
-    """Una capa puede declarar varios colores y se sortea uno por wallpaper."""
-    if isinstance(color, list):
-        if not color:
-            raise SpecError("la lista de colores de una capa está vacía")
-        return rng.choice(color)
-    return color
+def _choose(value, rng: random.Random, que: str):
+    """Una capa puede declarar varias opciones (colores, textos) y se sortea
+    una por wallpaper."""
+    if isinstance(value, list):
+        if not value:
+            raise SpecError(f"la lista de {que} de una capa está vacía")
+        return rng.choice(value)
+    return value
+
+
+def _choose_text(value, rng: random.Random):
+    """Como `_choose`, pero el texto también puede traer la lista adentro de
+    un objeto de configuración: {"text": [...], "weight": "bold"}."""
+    if isinstance(value, dict) and isinstance(value.get("text"), list):
+        opciones = value["text"]
+        if not opciones:
+            raise SpecError("la lista de textos de una capa está vacía")
+        return {**value, "text": rng.choice(opciones)}
+    return _choose(value, rng, "textos")
 
 
 @dataclass(frozen=True)
@@ -253,10 +268,17 @@ def save(image: Image.Image, path: Path, fmt: str = "png", quality: int = 92,
 def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
                  seed: int, indice: int) -> "Shaped":
     layer = placement.layer
-    nombre = layer.src.name if layer.src is not None else f"figura {layer.shape}"
+    if layer.src is not None:
+        nombre = layer.src.name
+    elif layer.shape is not None:
+        nombre = f"figura {layer.shape}"
+    else:
+        nombre = f"texto {str(layer.text)[:40]!r}"
     try:
         if layer.shape is not None:
             im = shapes.build(layer.shape, layer.outline)
+        elif layer.text is not None:
+            im = text_op.build(placement.text)
         else:
             im = loading.load(layer.src)
         im = crop.apply(im, layer.crop)
@@ -285,7 +307,7 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
             # capa manchada no corre el sorteo de las demás ni cambia los
             # wallpapers que ya existen.
             im = stain.apply(im, layer.stain, random.Random(seed * 1_000_003 + indice))
-        if layer.shape is not None:
+        if layer.shape is not None or layer.text is not None:
             # Ya sale en escala de grises exacta (relleno y contorno), sin
             # nada que normalizar o volver transparente por color.
             tonal = im
