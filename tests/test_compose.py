@@ -8,6 +8,7 @@ from pathlib import Path
 from PIL import Image
 
 from proun import compose, spec
+from proun import layout
 from proun.errors import SourceError, SpecError
 from proun.ops import blend
 
@@ -320,6 +321,95 @@ class ModoAlinear(unittest.TestCase):
             "layout": {"mode": "align"},
         })
         self.assertIsNotNone(compose.render(base, compose.plan(base, 4), (800, 450), AZUL))
+
+
+class Figuras(unittest.TestCase):
+    def config(self, **extra):
+        return spec.build({
+            "sources": [{"shape": "circle"}], "resolutions": ["400x300"],
+            "colors": [AZUL], "seeds": [3], "background": "#101010",
+            **extra,
+        })
+
+    def test_se_genera_y_renderiza(self):
+        base = self.config()
+        salida = compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        self.assertEqual(salida.size, (400, 300))
+
+    def test_hereda_el_color_del_lote(self):
+        base = self.config()
+        rojo = compose.render(base, compose.plan(base, 3), (400, 300), "#ff0000")
+        azul = compose.render(base, compose.plan(base, 3), (400, 300), "#0000ff")
+        self.assertNotEqual(rojo.tobytes(), azul.tobytes())
+
+    def test_una_lista_de_colores_se_sortea_por_capa(self):
+        base = self.config(sources=[{"shape": "circle",
+                                     "color": ["#ff0000", "#00ff00", "#0000ff"]}])
+        elegidos = {compose.plan(base, s).placements[0].color for s in range(20)}
+        self.assertGreater(len(elegidos), 1)
+
+    def test_convive_con_fotos_en_el_mismo_collage(self):
+        base = self.config(sources=[{"shape": "circle"}, str(FUENTES / "a.png")])
+        salida = compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        self.assertIsNotNone(salida)
+
+    def test_error_menciona_la_figura_no_un_archivo(self):
+        base = self.config(sources=[{"shape": "circle", "outline": {"inset": 5}}])
+        with self.assertRaises(SourceError) as caso:
+            compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        self.assertIn("figura circle", str(caso.exception))
+
+    def test_es_reproducible(self):
+        base = self.config()
+        plan = compose.plan(base, 3)
+        a = compose.render(base, plan, (400, 300), AZUL)
+        b = compose.render(base, plan, (400, 300), AZUL)
+        self.assertEqual(a.tobytes(), b.tobytes())
+
+
+class RateYOverlapEnElPlan(unittest.TestCase):
+    def config(self, **extra):
+        return spec.build({
+            "sources": [str(FUENTES / "a.png"), str(FUENTES / "b.png")],
+            "resolutions": ["400x300"], "colors": [AZUL], "seeds": [1],
+            **extra,
+        })
+
+    def test_rate_cero_nunca_aparece(self):
+        base = self.config(sources=[{"src": str(FUENTES / "a.png"), "rate": 0.0}])
+        apariciones = [len(compose.plan(base, s).placements) for s in range(30)]
+        self.assertTrue(all(n == 0 for n in apariciones))
+
+    def test_rate_uno_no_cambia_el_plan_de_antes(self):
+        # Sin rate en ninguna capa, el plan debe ser idéntico a como era.
+        base = self.config()
+        otra_vez = self.config()
+        self.assertEqual(compose.plan(base, 5), compose.plan(otra_vez, 5))
+
+    def test_overlap_separa_capas_del_mismo_tamano(self):
+        base = self.config(
+            sources=[{"shape": "circle", "overlap": 0.05, "resize": {"size": [0.3, 0.3]}}] * 2,
+            layout={"mode": "free", "bleed": 0},
+        )
+        plan = compose.plan(base, 4)
+        c1, c2 = (p.center for p in plan.placements)
+        distancia = ((c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2) ** 0.5
+        self.assertGreater(distancia, 0.15)
+
+    def test_sin_overlap_declarado_no_consume_el_generador(self):
+        # _avoid_overlap con overlap=None en todas las capas debe ser un
+        # passthrough puro: mismos centros, sin gastar aleatoriedad.
+        capas = spec.build({
+            "sources": [str(FUENTES / "a.png"), str(FUENTES / "b.png")],
+            "resolutions": ["400x300"], "colors": [AZUL], "seeds": [1],
+        }).sources
+        centros = [(0.2, 0.3), (0.7, 0.8)]
+        fills = [0.3, 0.3]
+        r = __import__("random").Random(9)
+        estado_antes = r.getstate()
+        resultado = compose._avoid_overlap(capas, centros, fills, r)
+        self.assertEqual(resultado, centros)
+        self.assertEqual(r.getstate(), estado_antes)
 
 
 class RegionSangradoYColor(unittest.TestCase):

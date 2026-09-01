@@ -241,6 +241,77 @@ class RegionYSangrado(unittest.TestCase):
         self.assertIsNone(capa.bleed)
 
 
+class Figuras(unittest.TestCase):
+    def test_una_figura_no_necesita_src(self):
+        config = spec.build(base(sources=[{"shape": "circle"}]))
+        self.assertEqual(len(config.sources), 1)
+        self.assertIsNone(config.sources[0].src)
+        self.assertEqual(config.sources[0].shape, "circle")
+
+    def test_shape_y_src_son_excluyentes(self):
+        with self.assertRaises(SpecError):
+            spec.build(base(sources=[{"shape": "circle", "src": str(FUENTES / "a.png")}]))
+
+    def test_sin_shape_ni_src(self):
+        with self.assertRaises(SpecError):
+            spec.build(base(sources=[{"opacity": 0.5}]))
+
+    def test_outline_viaja_intacto(self):
+        config = spec.build(base(sources=[
+            {"shape": "circle", "outline": {"inset": 0.2, "width": 0.05}}
+        ]))
+        self.assertEqual(config.sources[0].outline, {"inset": 0.2, "width": 0.05})
+
+    def test_outline_no_es_objeto(self):
+        with self.assertRaises(SpecError):
+            spec.build(base(sources=[{"shape": "circle", "outline": "grueso"}]))
+
+    def test_copies_funciona_igual_que_con_fotos(self):
+        config = spec.build(base(sources=[{"shape": "circle", "copies": 4}]))
+        self.assertEqual(len(config.sources), 4)
+
+    def test_hereda_defaults_como_cualquier_capa(self):
+        config = spec.build(base(
+            defaults={"opacity": 0.4, "blend": "screen"},
+            sources=[{"shape": "circle"}],
+        ))
+        self.assertEqual(config.sources[0].opacity, 0.4)
+        self.assertEqual(config.sources[0].blend, "screen")
+
+    def test_puede_convivir_con_fotos_en_la_misma_lista(self):
+        config = spec.build(base(sources=[{"shape": "circle"}, str(FUENTES / "a.png")]))
+        self.assertEqual(len(config.sources), 2)
+        tipos = {c.shape is not None for c in config.sources}
+        self.assertEqual(tipos, {True, False})
+
+
+class RateYOverlap(unittest.TestCase):
+    def test_rate_por_defecto_es_uno(self):
+        self.assertEqual(spec.build(base(sources=[{"shape": "circle"}])).sources[0].rate, 1.0)
+
+    def test_overlap_por_defecto_es_none(self):
+        self.assertIsNone(spec.build(base(sources=[{"shape": "circle"}])).sources[0].overlap)
+
+    def test_valores_explicitos(self):
+        config = spec.build(base(sources=[{"shape": "circle", "rate": 0.4, "overlap": 0.1}]))
+        self.assertEqual(config.sources[0].rate, 0.4)
+        self.assertEqual(config.sources[0].overlap, 0.1)
+
+    def test_rate_fuera_de_rango(self):
+        for malo in (-0.1, 1.1, "poco", True):
+            with self.assertRaises(SpecError, msg=malo):
+                spec.build(base(sources=[{"shape": "circle", "rate": malo}]))
+
+    def test_overlap_fuera_de_rango(self):
+        for malo in (-0.1, 1.1, "poco", True):
+            with self.assertRaises(SpecError, msg=malo):
+                spec.build(base(sources=[{"shape": "circle", "overlap": malo}]))
+
+    def test_tambien_aplican_a_fotos(self):
+        config = spec.build(base(sources=[{"src": str(FUENTES / "a.png"), "rate": 0.5}]))
+        self.assertEqual(config.sources[0].rate, 0.5)
+
+
 class Defaults(unittest.TestCase):
     def test_se_aplican_a_todas(self):
         config = spec.build(base(defaults={"rotate": "random", "blend": "screen"},

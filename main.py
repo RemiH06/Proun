@@ -37,12 +37,9 @@ CONFIG = {
     # --- cómo se compone ---------------------------------------------------
     # "layers": {"min": 4, "max": 7},    # cuántas imágenes por collage
     "layout": {
-        "mode": "scatter",       # scatter, free, grid, row, column, stack, align
-        "bleed": 0.12,           # cuánto pueden salirse del borde (no aplica a align)
+        "mode": "scatter",       # scatter, free, grid, row, column, stack
+        "bleed": 0.12,           # cuánto pueden salirse del borde
         "size": [0.38, 0.82],    # fracción del lienzo por capa sin resize propio
-        # "width": 0.92,         # solo align: ancho del bloque, fracción del lienzo
-        # "gap": 2,              # solo align: separación entre piezas, en píxeles
-        # "anchor": "center",    # solo align: top, center o bottom
     },
     "background": "auto",        # "auto", None, un color, o {"gradient": [...]}
     # "finish": {"vignette": 0.3, "grain": 0.05, "contrast": 1.05},
@@ -63,6 +60,23 @@ CONFIG = {
 }
 
 
+# Una figura geométrica en vez de una foto: sin "src", con "shape". Sale en
+# escala de grises y hereda el mismo recolor que las fotos, así que acompaña
+# el color del lote (o su propia lista de colores) automáticamente.
+#
+# {
+#     "shape": "circle",              # rect, circle, triangle, diamond, polygon
+#     # "shape": {"kind": "polygon", "sides": 6},
+#     "outline": {"inset": 0.12, "width": 0.03},  # el contorno vive hacia adentro
+#     "color": ["#e0504a", "#4a9de0", "#e0c24a"],  # sortea uno por wallpaper
+#     "opacity": 0.55,
+#     "blend": "screen",
+#     "resize": {"size": [0.3, 0.3]},
+#     "rate": 0.7,      # probabilidad de aparecer en un wallpaper dado
+#     "overlap": 0.15,  # máximo solape permitido contra otras capas con overlap
+#     "copies": 4,
+# }
+
 # Una capa con todos sus ajustes, por si hace falta copiarla a "sources":
 #
 # {
@@ -72,37 +86,16 @@ CONFIG = {
 #     "resize": {"size": [0.5, 0.5], "mode": "fill"},
 #     "mosaic": {"grid": [4, 1], "mirror": True},
 #     "rotate": {"range": [-6, 6], "step": 3},
-#     "stain": {"amount": 0.6, "scale": 0.3, "edges": 0.8, "threshold": 0.4},
 #     "tones": {"normalize": True, "gamma": 1.2, "invert": False},
-#     "transparent": {"color": "light", "tolerance": 0, "softness": 1},
 #     "recolor": {"mode": "duotone", "strength": 0.9, "mix_with": "tones"},
 #     "color": "#ffb347",  # ignora el color del lote
 #     "opacity": 0.8,
 #     "blend": "multiply",
-#     "position": [0.5, 0.5],   # posición exacta; manda sobre region
+#     "position": [0.5, 0.5],
 #     "anchor": "center",
-#     "region": [0.5, 0, 1, 0.5],   # o "topright": dónde puede caer al azar
-#     "bleed": 0.15,       # cuánto puede salirse, en fracción de su tamaño
-#     "color": ["#ff0000", "#3ba7ff"],   # sortea uno por wallpaper
 #     "repeat": {"step": [0.5, 0], "times": 2, "mirror": True},
 #     "copies": 2,         # cuántas veces entra esta imagen al collage
 # }
-
-
-# Tinta sobre papel, el registro del fondo de referencia: el lienzo es claro,
-# el extremo claro de cada imagen desaparece y solo lo oscuro se acumula al
-# solaparse. No es un preset, son cuatro claves en "defaults":
-#
-# "background": "#f4f1ea",
-# "defaults": {
-#     "tones": True,
-#     "transparent": {"color": "light", "tolerance": 0.05, "softness": 0.9},
-#     "recolor": {"mode": "duotone", "shadow": "#111111", "highlight": "#777777"},
-#     "blend": "multiply",
-# },
-#
-# Para la polaridad contraria, tinta clara sobre fondo oscuro, basta cambiar
-# "light" por "dark", el fondo por uno oscuro y el blend por "screen".
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ from PIL import Image
 from . import colors, layout, loading
 from .errors import SourceError, SpecError
 from .ops import (background, blend, crop, finish, mosaic, recolor, repeat, resize,
-                  rotate, stain, tones, transparency)
+                  rotate, shapes, stain, tones, transparency)
 from .spec import Layer, Spec
 
 
@@ -48,7 +48,8 @@ def plan(spec: Spec, seed: int) -> Plan:
     """
     rng = random.Random(seed)
     covers = [layer for layer in spec.sources if layer.cover]
-    resto = _pick([layer for layer in spec.sources if not layer.cover], spec.layers, rng)
+    candidatos = _filter_by_rate([layer for layer in spec.sources if not layer.cover], rng)
+    resto = _pick(candidatos, spec.layers, rng)
     rng.shuffle(resto)
 
     placements = [
@@ -59,6 +60,7 @@ def plan(spec: Spec, seed: int) -> Plan:
     turns = [rotate.decide(layer.rotate, rng) for layer in resto]
     centers = layout.positions(len(resto), rng, spec.layout)
     fills = layout.sizes(len(resto), rng, spec.layout)
+    centers = _avoid_overlap(resto, centers, fills, rng)
     placements += [
         Placement(layer=layer, angle=angle, flip=flip,
                   center=_region_center(center, layer.region), fill=fill,
@@ -66,6 +68,63 @@ def plan(spec: Spec, seed: int) -> Plan:
         for layer, (angle, flip), center, fill in zip(resto, turns, centers, fills)
     ]
     return Plan(seed=seed, placements=tuple(placements))
+
+
+def _filter_by_rate(layers, rng: random.Random):
+    """Cada capa tiene una probabilidad `rate` de entrar al sorteo de cuántas hay.
+
+    No consume el generador para una capa con rate=1 (el default), así que
+    ninguna especificación existente cambia de resultado por esta función.
+    """
+    return [l for l in layers if l.rate >= 1.0 or rng.random() < l.rate]
+
+
+def _avoid_overlap(layers, centers, fills, rng: random.Random):
+    """Reubica por rechazo las capas que declararon `overlap`.
+
+    Es una aproximación: compara contra `fill`, el tamaño de respaldo que
+    sortea `layout.sizes`, así que una capa con `resize`, `crop` o `mosaic`
+    propio (cuyo tamaño real no se conoce hasta `prepare`) no se mide bien
+    contra las demás. Las capas sin `overlap` no se tocan y no consumen el
+    generador: se devuelven en las mismas coordenadas crudas que entregó
+    `layout.positions`, para que el mapeo de región de más abajo siga
+    aplicándose una sola vez.
+    """
+    cajas = []
+    crudos = list(centers)
+    for i, layer in enumerate(layers):
+        mapeado = _region_center(centers[i], layer.region)
+        media = fills[i] / 2
+        if layer.overlap is None:
+            cajas.append((*mapeado, media, media))
+            continue
+        mejor_crudo, mejor_mapeado = centers[i], mapeado
+        peor = _worst_overlap(mejor_mapeado, media, cajas)
+        intentos = 0
+        while peor > layer.overlap and intentos < 30:
+            crudo = (rng.random(), rng.random())
+            candidato = _region_center(crudo, layer.region)
+            solape = _worst_overlap(candidato, media, cajas)
+            if solape < peor:
+                mejor_crudo, mejor_mapeado, peor = crudo, candidato, solape
+            intentos += 1
+        crudos[i] = mejor_crudo
+        cajas.append((*mejor_mapeado, media, media))
+    return crudos
+
+
+def _worst_overlap(centro, media, cajas) -> float:
+    peor = 0.0
+    for cx, cy, chw, chh in cajas:
+        ix = max(0.0, min(centro[0] + media, cx + chw) - max(centro[0] - media, cx - chw))
+        iy = max(0.0, min(centro[1] + media, cy + chh) - max(centro[1] - media, cy - chh))
+        interseccion = ix * iy
+        if interseccion == 0:
+            continue
+        area_menor = min((2 * media) ** 2, (2 * chw) * (2 * chh))
+        if area_menor > 0:
+            peor = max(peor, interseccion / area_menor)
+    return peor
 
 
 def _region_center(center, region):
@@ -194,8 +253,12 @@ def save(image: Image.Image, path: Path, fmt: str = "png", quality: int = 92,
 def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
                  seed: int, indice: int) -> "Shaped":
     layer = placement.layer
+    nombre = layer.src.name if layer.src is not None else f"figura {layer.shape}"
     try:
-        im = loading.load(layer.src)
+        if layer.shape is not None:
+            im = shapes.build(layer.shape, layer.outline)
+        else:
+            im = loading.load(layer.src)
         im = crop.apply(im, layer.crop)
         if layer.cover:
             # El ajuste al lienzo va al final, después de girar: si se hiciera
@@ -222,13 +285,18 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
             # capa manchada no corre el sorteo de las demás ni cambia los
             # wallpapers que ya existen.
             im = stain.apply(im, layer.stain, random.Random(seed * 1_000_003 + indice))
-        tonal = transparency.apply(tones.apply(im, layer.tones), layer.transparent)
-        keep = str(layer.recolor.get("mix_with", "tones")).lower() == "source"
+        if layer.shape is not None:
+            # Ya sale en escala de grises exacta (relleno y contorno), sin
+            # nada que normalizar o volver transparente por color.
+            tonal = im
+        else:
+            tonal = transparency.apply(tones.apply(im, layer.tones), layer.transparent)
+        keep = layer.src is not None and str(layer.recolor.get("mix_with", "tones")).lower() == "source"
         return Shaped(tonal=tonal, source=im if keep else None)
     except SourceError:
         raise
     except Exception as exc:
-        raise SourceError(f"falló el procesado de {layer.src.name}: {exc}") from exc
+        raise SourceError(f"falló el procesado de {nombre}: {exc}") from exc
 
 
 def _scale(spec: Spec, resolution) -> float:

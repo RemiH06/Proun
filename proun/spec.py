@@ -20,7 +20,7 @@ LAYER_KEYS = {
     "src", "crop", "resize", "mosaic", "rotate", "stain", "tones", "transparent",
     "recolor", "color",
     "opacity", "blend", "position", "anchor", "region", "bleed", "copies",
-    "repeat", "cover",
+    "repeat", "cover", "shape", "outline", "rate", "overlap",
 }
 
 SPEC_KEYS = {
@@ -34,9 +34,11 @@ FORMATS = frozenset({"png", "jpg", "jpeg", "webp"})
 
 @dataclass(frozen=True)
 class Layer:
-    """Una imagen del collage con sus ajustes ya fusionados con los generales."""
+    """Una imagen o una figura del collage con sus ajustes ya fusionados con los generales."""
 
-    src: Path
+    src: Path | None = None
+    shape: object = None
+    outline: dict = field(default_factory=dict)
     crop: object = None
     resize: object = None
     mosaic: object = None
@@ -54,6 +56,8 @@ class Layer:
     region: object = None
     bleed: object = None
     cover: bool = False
+    rate: float = 1.0
+    overlap: object = None
 
 
 @dataclass(frozen=True)
@@ -309,6 +313,20 @@ def _bleed(value):
     return (salida[0], salida[1])
 
 
+def _rate(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
+        raise SpecError(f"rate debe estar entre 0 y 1, llegó {value!r}")
+    return float(value)
+
+
+def _overlap(value):
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
+        raise SpecError(f"overlap debe estar entre 0 y 1, llegó {value!r}")
+    return float(value)
+
+
 def _sources(value, defaults: dict) -> tuple[Layer, ...]:
     if not value:
         raise SpecError("hace falta al menos una imagen en sources")
@@ -326,13 +344,12 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
         unknown = set(entry) - LAYER_KEYS
         if unknown:
             raise SpecError(f"claves desconocidas en una imagen: {sorted(unknown)}")
-        if "src" not in entry:
-            raise SpecError(f"a esta imagen le falta 'src': {entry!r}")
+        if "src" in entry and "shape" in entry:
+            raise SpecError(f"una capa es imagen o figura, no las dos: {entry!r}")
+        if "src" not in entry and "shape" not in entry:
+            raise SpecError(f"a esta imagen le falta 'src' o 'shape': {entry!r}")
 
-        paths = loading.expand(entry["src"])
-        if not paths:
-            raise SpecError(f"ningún archivo coincide con {entry['src']!r}")
-        merged = {**defaults, **{k: v for k, v in entry.items() if k != "src"}}
+        merged = {**defaults, **{k: v for k, v in entry.items() if k not in ("src", "shape")}}
         copies = merged.pop("copies", 1)
         if not isinstance(copies, int) or isinstance(copies, bool) or not 1 <= copies <= 500:
             raise SpecError(f"copies debe ser un entero entre 1 y 500, llegó {copies!r}")
@@ -355,27 +372,46 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
         if isinstance(opacity, bool) or not isinstance(opacity, (int, float)) \
                 or not 0 <= opacity <= 1:
             raise SpecError(f"opacity debe estar entre 0 y 1, llegó {opacity!r}")
+        rate = _rate(merged.pop("rate", 1.0))
+        overlap = _overlap(merged.pop("overlap", None))
 
+        comun = dict(
+            crop=merged.get("crop"),
+            resize=merged.get("resize"),
+            mosaic=merged.get("mosaic"),
+            repeat=merged.get("repeat"),
+            rotate=merged.get("rotate"),
+            stain=merged.get("stain"),
+            recolor=dict(recolor),
+            color=merged.get("color"),
+            opacity=float(opacity),
+            blend=str(merged.get("blend", "normal")),
+            position=merged.get("position"),
+            anchor=merged.get("anchor", "center"),
+            region=_region(merged.get("region")),
+            bleed=_bleed(merged.get("bleed")),
+            cover=cover,
+            rate=rate,
+            overlap=overlap,
+        )
+
+        if "shape" in entry:
+            # Una figura no tiene archivo que expandir: se crean `copies`
+            # instancias directas. tones/transparent no aplican, se generan
+            # ya en escala de grises lista para recolor.
+            outline = merged.get("outline", {})
+            if not isinstance(outline, dict):
+                raise SpecError(f"outline debe ser un objeto, llegó {outline!r}")
+            for _ in range(copies):
+                layers.append(Layer(shape=entry["shape"], outline=dict(outline), **comun))
+            continue
+
+        paths = loading.expand(entry["src"])
+        if not paths:
+            raise SpecError(f"ningún archivo coincide con {entry['src']!r}")
+        tones = merged.get("tones", True)
+        transparent = merged.get("transparent")
         for path in paths:
             for _ in range(copies):
-                layers.append(Layer(
-                    src=path,
-                    crop=merged.get("crop"),
-                    resize=merged.get("resize"),
-                    mosaic=merged.get("mosaic"),
-                    repeat=merged.get("repeat"),
-                    rotate=merged.get("rotate"),
-                    stain=merged.get("stain"),
-                    tones=merged.get("tones", True),
-                    transparent=merged.get("transparent"),
-                    recolor=dict(recolor),
-                    color=merged.get("color"),
-                    opacity=float(opacity),
-                    blend=str(merged.get("blend", "normal")),
-                    position=merged.get("position"),
-                    anchor=merged.get("anchor", "center"),
-                    region=_region(merged.get("region")),
-                    bleed=_bleed(merged.get("bleed")),
-                    cover=cover,
-                ))
+                layers.append(Layer(src=path, tones=tones, transparent=transparent, **comun))
     return tuple(layers)
