@@ -21,6 +21,7 @@ LAYER_KEYS = {
     "recolor", "color",
     "opacity", "blend", "position", "anchor", "region", "bleed", "copies",
     "repeat", "cover", "shape", "outline", "rate", "overlap", "text",
+    "pool", "pool_bias",
 }
 
 SPEC_KEYS = {
@@ -40,6 +41,8 @@ class Layer:
     shape: object = None
     outline: dict = field(default_factory=dict)
     text: object = None
+    pool: object = None
+    pool_bias: float = 2.0
     crop: object = None
     resize: object = None
     mosaic: object = None
@@ -345,14 +348,16 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
         unknown = set(entry) - LAYER_KEYS
         if unknown:
             raise SpecError(f"claves desconocidas en una imagen: {sorted(unknown)}")
-        tipos = {"src", "shape", "text"} & set(entry)
+        tipos = {"src", "shape", "text", "pool"} & set(entry)
         if len(tipos) > 1:
-            raise SpecError(f"una capa es imagen, figura o texto, no varias a la vez: {entry!r}")
+            raise SpecError(
+                f"una capa es imagen, figura, texto o pool, no varias a la vez: {entry!r}"
+            )
         if not tipos:
-            raise SpecError(f"a esta capa le falta 'src', 'shape' o 'text': {entry!r}")
+            raise SpecError(f"a esta capa le falta 'src', 'shape', 'text' o 'pool': {entry!r}")
 
         merged = {**defaults,
-                 **{k: v for k, v in entry.items() if k not in ("src", "shape", "text")}}
+                 **{k: v for k, v in entry.items() if k not in ("src", "shape", "text", "pool")}}
         copies = merged.pop("copies", 1)
         if not isinstance(copies, int) or isinstance(copies, bool) or not 1 <= copies <= 500:
             raise SpecError(f"copies debe ser un entero entre 1 y 500, llegó {copies!r}")
@@ -415,6 +420,20 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
             # como el resto de las operaciones (crop, resize, mosaic...).
             for _ in range(copies):
                 layers.append(Layer(text=entry["text"], **comun))
+            continue
+
+        if "pool" in entry:
+            # A diferencia de src, el pool NO se reparte en una capa por
+            # archivo: son candidatas de una sola capa, y cuál de ellas se
+            # usa se decide en plan(), una vez por wallpaper.
+            candidatas = loading.expand(entry["pool"])
+            if not candidatas:
+                raise SpecError(f"ningún archivo coincide con el pool: {entry['pool']!r}")
+            bias = merged.get("pool_bias", 2.0)
+            if isinstance(bias, bool) or not isinstance(bias, (int, float)) or bias <= 0:
+                raise SpecError(f"pool_bias debe ser un número positivo, llegó {bias!r}")
+            for _ in range(copies):
+                layers.append(Layer(pool=tuple(candidatas), pool_bias=float(bias), **comun))
             continue
 
         paths = loading.expand(entry["src"])

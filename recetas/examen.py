@@ -11,8 +11,13 @@ contra los míos de prueba.
 Mapa de anotaciones -> mecanismo:
 
     amarillo, verde, azul, morado   ops.repeat, cuatro configuraciones distintas
-    naranja                         layout.mode = "align", con crop por fuente
-    vino tinto                      un crop aislado, con position fija
+    naranja                         layout.mode = "align", con crop por
+                                     capa, tomando cada pieza de un "pool":
+                                     varias candidatas de Museos, sorteadas
+                                     con más probabilidad la que mejor calza
+                                     el recorte pedido (ver pendiente 8)
+    vino tinto                      un crop aislado con "pool" y un aspecto
+                                     angosto, position fija
     rosa/lima/celeste               tres capas independientes confinadas a
                                      una misma "region", solapándose
     marrón                          la capa de texto: sin tratamiento propio,
@@ -82,13 +87,18 @@ CONFIG = {
          "recolor": LAVADO, "opacity": 0.5},
 
         # --- amarillo: horizontal, copias casi pegadas, poco solape -------
-        {"src": f"{MUSEOS}/squares.JPG", "position": [0.16, 0.12], "anchor": "topleft",
-         "resize": {"size": [0.11, 0.22]},
+        # Pool en vez de un archivo fijo: no sé cuál de tus fotos tiene la
+        # textura de rejilla que se ve en la referencia, así que Proun elige
+        # entre todo Museos, ponderado hacia lo que mejor calza el recorte
+        # angosto. Si ya identificaste el archivo correcto, cámbialo por un
+        # "src" normal, que es más rápido y no adivina nada.
+        {"pool": MUSEOS, "position": [0.16, 0.12], "anchor": "topleft",
+         "crop": {"aspect": "1:2", "auto_rotate": True}, "resize": {"size": [0.11, 0.22]},
          "repeat": {"step": [0.85, 0], "times": 3}},
 
         # --- verde: mismo principio, menos copias, otra esquina -----------
-        {"src": f"{MUSEOS}/tests.JPG", "position": [0.0, 1.0], "anchor": "bottomleft",
-         "resize": {"size": [0.08, 0.14]},
+        {"pool": MUSEOS, "position": [0.0, 1.0], "anchor": "bottomleft",
+         "crop": {"aspect": "1:2", "auto_rotate": True}, "resize": {"size": [0.08, 0.14]},
          "repeat": {"step": [0.85, 0], "times": 1}},
 
         # --- azul: vertical, piezas que se tocan y siguen ------------------
@@ -105,8 +115,13 @@ CONFIG = {
 
         # --- vino tinto: un crop aislado, posición fija --------------------
         # Busca en tus fuentes algo con líneas horizontales tipo redacción de
-        # documento (tachaduras, subrayados); aquí es un placeholder.
-        {"src": f"{MUSEOS}/golden2.JPG", "crop": {"aspect": "3:1", "anchor": "center"},
+        # documento (tachaduras, subrayados). Mientras tanto, pool sobre
+        # Museos con un aspecto muy angosto: no va a encontrar líneas de
+        # texto porque Museos no las tiene, es solo para que el hueco no
+        # quede vacío. Cuando identifiques la fuente correcta, sería mejor
+        # un "src" fijo aquí, porque el contenido específico importa más que
+        # la proporción.
+        {"pool": MUSEOS, "crop": {"aspect": "5:1", "anchor": "center", "auto_rotate": True},
          "position": [0.03, 0.32], "anchor": "topleft", "resize": {"size": [0.1, 0.03]}},
 
         # --- rosa/lima/celeste: tres capas distintas, misma region ---------
@@ -119,16 +134,22 @@ CONFIG = {
         {"src": f"{MUSEOS}/three.JPG", "region": [0.38, 0.08, 0.55, 0.4],
          "resize": {"size": [0.17, 0.3]}, "opacity": 0.65},
 
-        # --- bloque naranja: align, con crop por fuente --------------------
+        # --- bloque naranja: align, con crop por capa -----------------------
         # Sin position ni region, así que caen en el bloque empaquetado.
-        {"src": f"{MUSEOS}/hexthree.JPG", "crop": {"aspect": "4:3", "anchor": "top"}},
-        {"src": f"{MUSEOS}/crouch.JPG", "crop": {"margin": 0.08}},
-        {"src": f"{MUSEOS}/mamooth.JPG", "crop": {"aspect": "16:9", "anchor": "center"}},
-        {"src": f"{MUSEOS}/ark.JPG", "crop": {"aspect": "1:1", "anchor": "left"}},
-        {"src": f"{MUSEOS}/tut.JPG", "crop": {"aspect": "3:4", "anchor": "top"}},
-        {"src": f"{MUSEOS}/golden.JPG", "crop": {"margin": 0.1}},
-        {"src": f"{MUSEOS}/small.JPG"},
-        {"src": f"{MUSEOS}/yellow.JPG", "crop": {"aspect": "16:9", "anchor": "bottom"}},
+        # Cada entrada es un pool sobre todo Museos: cada una pide un
+        # recorte de proporción distinta, y Proun sortea qué archivo real
+        # usar ponderado hacia el que mejor calza ese recorte en particular.
+        # El mismo archivo puede salir elegido en más de una entrada, que es
+        # exactamente lo que pasa en la referencia: la misma pieza recortada
+        # de formas distintas en distintos lugares del bloque.
+        {"pool": MUSEOS, "crop": {"aspect": "4:3", "anchor": "top", "auto_rotate": True}},
+        {"pool": MUSEOS, "crop": {"aspect": "1:1", "auto_rotate": True}},
+        {"pool": MUSEOS, "crop": {"aspect": "16:9", "anchor": "center", "auto_rotate": True}},
+        {"pool": MUSEOS, "crop": {"aspect": "1:1", "anchor": "left", "auto_rotate": True}},
+        {"pool": MUSEOS, "crop": {"aspect": "3:4", "anchor": "top", "auto_rotate": True}},
+        {"pool": MUSEOS, "crop": {"margin": 0.1}},
+        {"pool": MUSEOS, "crop": {"aspect": "4:3", "auto_rotate": True}},
+        {"pool": MUSEOS, "crop": {"aspect": "16:9", "anchor": "bottom", "auto_rotate": True}},
 
         # --- texto: sin tratamiento propio, la mancha del fondo lo atraviesa
         {"text": {"text": "PROUN", "weight": "bold"}, "region": [0.02, 0.3, 0.2, 0.5],

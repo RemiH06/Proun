@@ -428,6 +428,61 @@ class Textos(unittest.TestCase):
         self.assertTrue(all(n == 0 for n in apariciones))
 
 
+class Pools(unittest.TestCase):
+    def config(self, **extra):
+        return spec.build({
+            "sources": [{"pool": str(FUENTES)}], "resolutions": ["400x300"],
+            "colors": [AZUL], "seeds": [3], "background": "#101010",
+            **extra,
+        })
+
+    def test_se_resuelve_a_un_archivo_concreto(self):
+        base = self.config()
+        p = compose.plan(base, 3)
+        self.assertIn(p.placements[0].pool_choice, base.sources[0].pool)
+
+    def test_se_renderiza(self):
+        base = self.config()
+        salida = compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        self.assertEqual(salida.size, (400, 300))
+
+    def test_semillas_distintas_pueden_elegir_distinto(self):
+        base = self.config()
+        elegidos = {compose.plan(base, s).placements[0].pool_choice for s in range(15)}
+        self.assertGreater(len(elegidos), 1)
+
+    def test_es_reproducible(self):
+        base = self.config()
+        plan = compose.plan(base, 3)
+        a = compose.render(base, plan, (400, 300), AZUL)
+        b = compose.render(base, plan, (400, 300), AZUL)
+        self.assertEqual(a.tobytes(), b.tobytes())
+
+    def test_sin_crop_aspect_no_pondera(self):
+        # Sin hueco declarado, _target_aspect debe devolver None y el
+        # sorteo cae en el camino uniforme.
+        base = self.config()
+        self.assertIsNone(compose._target_aspect(base.sources[0]))
+
+    def test_con_crop_aspect_si_pondera(self):
+        base = self.config(sources=[{"pool": str(FUENTES), "crop": {"aspect": "3:1"}}])
+        self.assertAlmostEqual(compose._target_aspect(base.sources[0]), 3.0)
+
+    def test_error_menciona_el_pool(self):
+        base = self.config(sources=[{"pool": str(FUENTES / "a.png"),
+                                     "crop": {"aspect": "bogus"}}])
+        with self.assertRaises((SourceError, SpecError)):
+            compose.plan(base, 3)
+
+    def test_convive_con_fotos_figuras_y_texto(self):
+        base = self.config(sources=[
+            {"pool": str(FUENTES)}, {"shape": "circle"}, {"text": "PROUN"},
+            str(FUENTES / "a.png"),
+        ])
+        salida = compose.render(base, compose.plan(base, 3), (400, 300), AZUL)
+        self.assertIsNotNone(salida)
+
+
 class RateYOverlapEnElPlan(unittest.TestCase):
     def config(self, **extra):
         return spec.build({

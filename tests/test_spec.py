@@ -325,6 +325,61 @@ class Textos(unittest.TestCase):
         self.assertEqual(len(config.sources), 3)
 
 
+class Pools(unittest.TestCase):
+    def test_un_pool_no_se_reparte_en_una_capa_por_archivo(self):
+        # A diferencia de src, todo el glob es UNA sola capa.
+        config = spec.build(base(sources=[{"pool": str(FUENTES)}]))
+        self.assertEqual(len(config.sources), 1)
+        self.assertGreater(len(config.sources[0].pool), 1)
+
+    def test_pool_es_una_tupla_de_rutas(self):
+        config = spec.build(base(sources=[{"pool": str(FUENTES / "*.png")}]))
+        self.assertIsInstance(config.sources[0].pool, tuple)
+
+    def test_pool_vacio_es_un_error(self):
+        with self.assertRaises(SpecError):
+            spec.build(base(sources=[{"pool": str(FUENTES / "no-existe-*.png")}]))
+
+    def test_cuatro_tipos_son_excluyentes_entre_si(self):
+        for combo in (
+            {"pool": str(FUENTES), "src": str(FUENTES / "a.png")},
+            {"pool": str(FUENTES), "shape": "circle"},
+            {"pool": str(FUENTES), "text": "PROUN"},
+        ):
+            with self.assertRaises(SpecError, msg=combo):
+                spec.build(base(sources=[combo]))
+
+    def test_pool_bias_por_defecto(self):
+        config = spec.build(base(sources=[{"pool": str(FUENTES)}]))
+        self.assertEqual(config.sources[0].pool_bias, 2.0)
+
+    def test_pool_bias_explicito(self):
+        config = spec.build(base(sources=[{"pool": str(FUENTES), "pool_bias": 5}]))
+        self.assertEqual(config.sources[0].pool_bias, 5.0)
+
+    def test_pool_bias_invalido(self):
+        for malo in (0, -1, "alto", True):
+            with self.assertRaises(SpecError, msg=malo):
+                spec.build(base(sources=[{"pool": str(FUENTES), "pool_bias": malo}]))
+
+    def test_copies_da_varias_capas_cada_una_con_su_propio_pool(self):
+        config = spec.build(base(sources=[{"pool": str(FUENTES), "copies": 3}]))
+        self.assertEqual(len(config.sources), 3)
+        self.assertTrue(all(c.pool == config.sources[0].pool for c in config.sources))
+
+    def test_hereda_defaults(self):
+        config = spec.build(base(defaults={"opacity": 0.5},
+                                 sources=[{"pool": str(FUENTES)}]))
+        self.assertEqual(config.sources[0].opacity, 0.5)
+
+    def test_convive_con_los_otros_tres_tipos(self):
+        config = spec.build(base(sources=[
+            {"pool": str(FUENTES)}, {"shape": "circle"}, {"text": "PROUN"},
+            str(FUENTES / "a.png"),
+        ]))
+        self.assertEqual(len(config.sources), 4)
+
+
 class RateYOverlap(unittest.TestCase):
     def test_rate_por_defecto_es_uno(self):
         self.assertEqual(spec.build(base(sources=[{"shape": "circle"}])).sources[0].rate, 1.0)

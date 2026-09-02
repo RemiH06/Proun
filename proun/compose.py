@@ -16,8 +16,9 @@ from pathlib import Path
 
 from PIL import Image
 
-from . import colors, layout, loading
+from . import colors, layout, loading, pool as pool_module
 from .errors import SourceError, SpecError
+from .geometry import parse_aspect
 from .ops import (background, blend, crop, finish, mosaic, recolor, repeat, resize,
                   rotate, shapes, stain, text as text_op, tones, transparency)
 from .spec import Layer, Spec
@@ -32,6 +33,7 @@ class Placement:
     fill: float
     color: object = None
     text: object = None
+    pool_choice: object = None
 
 
 @dataclass(frozen=True)
@@ -56,7 +58,8 @@ def plan(spec: Spec, seed: int) -> Plan:
     placements = [
         Placement(layer=layer, angle=angle, flip=flip, center=(0.5, 0.5), fill=1.0,
                   color=_choose(layer.color, rng, "colores"),
-                  text=_choose_text(layer.text, rng))
+                  text=_choose_text(layer.text, rng),
+                  pool_choice=_choose_pool(layer, rng))
         for layer, (angle, flip) in zip(covers, [rotate.decide(c.rotate, rng) for c in covers])
     ]
     turns = [rotate.decide(layer.rotate, rng) for layer in resto]
@@ -67,7 +70,8 @@ def plan(spec: Spec, seed: int) -> Plan:
         Placement(layer=layer, angle=angle, flip=flip,
                   center=_region_center(center, layer.region), fill=fill,
                   color=_choose(layer.color, rng, "colores"),
-                  text=_choose_text(layer.text, rng))
+                  text=_choose_text(layer.text, rng),
+                  pool_choice=_choose_pool(layer, rng))
         for layer, (angle, flip), center, fill in zip(resto, turns, centers, fills)
     ]
     return Plan(seed=seed, placements=tuple(placements))
@@ -162,6 +166,21 @@ def _choose_text(value, rng: random.Random):
             raise SpecError("la lista de textos de una capa está vacía")
         return {**value, "text": rng.choice(opciones)}
     return _choose(value, rng, "textos")
+
+
+def _choose_pool(layer: Layer, rng: random.Random):
+    """Resuelve qué archivo del pool usa esta capa, ponderado por qué tan
+    bien calza contra `crop.aspect` si la capa lo declara."""
+    if layer.pool is None:
+        return None
+    return pool_module.choose(layer.pool, _target_aspect(layer), layer.pool_bias, rng)
+
+
+def _target_aspect(layer: Layer):
+    """El aspecto del hueco que esta capa dice que quiere llenar, si lo dice."""
+    if isinstance(layer.crop, dict) and "aspect" in layer.crop:
+        return parse_aspect(layer.crop["aspect"])
+    return None
 
 
 @dataclass(frozen=True)
@@ -272,6 +291,8 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
         nombre = layer.src.name
     elif layer.shape is not None:
         nombre = f"figura {layer.shape}"
+    elif layer.pool is not None:
+        nombre = f"{placement.pool_choice.name} (de un pool de {len(layer.pool)})"
     else:
         nombre = f"texto {str(layer.text)[:40]!r}"
     try:
@@ -279,6 +300,8 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
             im = shapes.build(layer.shape, layer.outline)
         elif layer.text is not None:
             im = text_op.build(placement.text)
+        elif layer.pool is not None:
+            im = loading.load(placement.pool_choice)
         else:
             im = loading.load(layer.src)
         im = crop.apply(im, layer.crop)
@@ -313,7 +336,8 @@ def _shape_layer(placement: Placement, measure_canvas, scale: float, resolution,
             tonal = im
         else:
             tonal = transparency.apply(tones.apply(im, layer.tones), layer.transparent)
-        keep = layer.src is not None and str(layer.recolor.get("mix_with", "tones")).lower() == "source"
+        keep = (layer.src is not None or layer.pool is not None) \
+            and str(layer.recolor.get("mix_with", "tones")).lower() == "source"
         return Shaped(tonal=tonal, source=im if keep else None)
     except SourceError:
         raise

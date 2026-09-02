@@ -63,5 +63,25 @@ def load(path) -> Image.Image:
     return cached.copy()
 
 
+def peek_size(path) -> tuple[int, int]:
+    """El tamaño de una imagen sin decodificar los píxeles, con la corrección
+    de orientación EXIF ya aplicada.
+
+    Sirve para pesar candidatas de un pool sin pagar el costo de abrir y
+    decodificar cada una entera: `Image.open` sin `.load()` solo lee la
+    cabecera.
+    """
+    key = Path(path).expanduser()
+    try:
+        with Image.open(key) as im:
+            w, h = im.size
+            orientacion = im.getexif().get(0x0112, 1)
+    except (UnidentifiedImageError, OSError) as exc:
+        raise SourceError(f"no se pudo leer la imagen {path}: {exc}") from exc
+    if orientacion in (5, 6, 7, 8):
+        w, h = h, w
+    return (w, h)
+
+
 def clear_cache() -> None:
     _cache.clear()
