@@ -109,6 +109,40 @@ class Margenes(unittest.TestCase):
             crop.apply(imagen(), {"margin": [1, 2, 3]})
 
 
+class AutoRotate(unittest.TestCase):
+    def test_gira_si_retiene_mas_area(self):
+        # Retrato angosto contra un slot ancho: girado retiene mucho más.
+        alto = imagen(200, 600)
+        sin = crop.apply(alto, {"aspect": "3:1"})
+        con = crop.apply(alto, {"aspect": "3:1", "auto_rotate": True})
+        self.assertGreater(con.size[0] * con.size[1], sin.size[0] * sin.size[1])
+
+    def test_no_gira_si_ya_conviene_tal_cual(self):
+        ancha = imagen(600, 200)
+        normal = crop.apply(ancha, {"aspect": "3:1"})
+        auto = crop.apply(ancha, {"aspect": "3:1", "auto_rotate": True})
+        self.assertEqual(normal.tobytes(), auto.tobytes())
+
+    def test_default_es_false(self):
+        alto = imagen(200, 600)
+        sin_declarar = crop.apply(alto, {"aspect": "3:1"})
+        declarado_false = crop.apply(alto, {"aspect": "3:1", "auto_rotate": False})
+        self.assertEqual(sin_declarar.tobytes(), declarado_false.tobytes())
+
+    def test_sin_aspect_es_un_error(self):
+        with self.assertRaises(SpecError):
+            crop.apply(imagen(), {"box": [0, 0, 10, 10], "auto_rotate": True})
+
+    def test_no_pierde_nitidez_es_transpose_no_rotate_libre(self):
+        # Un giro de 90 exacto no debe interpolar: recortar y comparar
+        # contra un giro manual con transpose debe dar bytes idénticos.
+        from PIL import Image
+        alto = imagen(200, 600)
+        con = crop.apply(alto, {"aspect": "3:1", "auto_rotate": True})
+        manual = crop.apply(alto.transpose(Image.Transpose.ROTATE_90), {"aspect": "3:1"})
+        self.assertEqual(con.tobytes(), manual.tobytes())
+
+
 class Validacion(unittest.TestCase):
     def test_clave_desconocida(self):
         with self.assertRaises(SpecError):

@@ -4,6 +4,9 @@ Formas aceptadas en `crop`:
     [x, y, ancho, alto]              recorte explícito
     {"box": [x, y, ancho, alto]}     lo mismo
     {"aspect": "16:9"}               el recorte más grande con esa proporción
+    {"aspect": "16:9", "auto_rotate": true}   igual, pero si girar la imagen
+                                      90° deja un recorte más grande (pierde
+                                      menos), gira antes de recortar
     {"margin": 0.1}                  quita margen por los cuatro lados
     {"margin": [x, y]}               margen horizontal y vertical
     {"margin": [i, s, d, inf]}       izquierda, superior, derecha, inferior
@@ -28,7 +31,7 @@ def apply(im: Image.Image, spec, rng=None) -> Image.Image:
         raise SpecError(f"crop debe ser una lista o un objeto, llegó {spec!r}")
 
     size = im.size
-    unknown = set(spec) - {"box", "aspect", "margin", "anchor"}
+    unknown = set(spec) - {"box", "aspect", "margin", "anchor", "auto_rotate"}
     if unknown:
         raise SpecError(f"claves desconocidas en crop: {sorted(unknown)}")
 
@@ -37,6 +40,8 @@ def apply(im: Image.Image, spec, rng=None) -> Image.Image:
         raise SpecError("crop necesita box, aspect o margin")
     if len(modes) > 1:
         raise SpecError(f"crop admite solo uno de box, aspect o margin: llegaron {sorted(modes)}")
+    if "auto_rotate" in spec and "aspect" not in spec:
+        raise SpecError("crop.auto_rotate solo tiene sentido junto a crop.aspect")
 
     if "box" in spec:
         raw = spec["box"]
@@ -53,7 +58,10 @@ def apply(im: Image.Image, spec, rng=None) -> Image.Image:
         if box[2] - box[0] < 1 or box[3] - box[1] < 1:
             raise SpecError(f"los márgenes {spec['margin']!r} no dejan imagen")
     elif "aspect" in spec:
-        inner = fit_box(size, parse_aspect(spec["aspect"]))
+        aspect = parse_aspect(spec["aspect"])
+        if spec.get("auto_rotate", False):
+            im, size = _best_orientation(im, size, aspect)
+        inner = fit_box(size, aspect)
         x, y = place_box(inner, size, anchor_factors(spec.get("anchor", "center"), rng))
         box = (x, y, x + inner[0], y + inner[1])
 
@@ -66,6 +74,18 @@ def apply(im: Image.Image, spec, rng=None) -> Image.Image:
     if clipped[2] <= clipped[0] or clipped[3] <= clipped[1]:
         raise SpecError(f"el recorte {box} queda fuera de la imagen de {size[0]}x{size[1]}")
     return im.crop(clipped)
+
+
+def _best_orientation(im: Image.Image, size, aspect):
+    """Compara recortar tal cual contra girar 90° primero, y se queda con lo
+    que retiene más área. Un giro múltiplo de 90 no pierde nitidez, así que
+    no cuesta nada probarlo."""
+    directo = fit_box(size, aspect)
+    girado_size = (size[1], size[0])
+    girado = fit_box(girado_size, aspect)
+    if girado[0] * girado[1] > directo[0] * directo[1]:
+        return im.transpose(Image.Transpose.ROTATE_90), girado_size
+    return im, size
 
 
 def _margins(value, size) -> tuple[int, int, int, int]:

@@ -1,0 +1,11 @@
+# Sin esto, Git en Windows puede "normalizar" finales de línea dentro de
+# archivos binarios (fuentes, imágenes) durante el checkout, corrompiéndolos
+# en silencio. El síntoma es justo "cannot open resource" al cargar un .ttf
+# que sí existe pero cuyos bytes ya no son los originales.
+*.ttf binary
+*.otf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.zip binary
