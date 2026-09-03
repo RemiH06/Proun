@@ -170,10 +170,13 @@ def _choose_text(value, rng: random.Random):
 
 def _choose_pool(layer: Layer, rng: random.Random):
     """Resuelve qué archivo del pool usa esta capa, ponderado por qué tan
-    bien calza contra `crop.aspect` si la capa lo declara."""
+    bien calza contra `crop.aspect` y, si se pide, qué tan oscuro saldría."""
     if layer.pool is None:
         return None
-    return pool_module.choose(layer.pool, _target_aspect(layer), layer.pool_bias, rng)
+    return pool_module.choose(
+        layer.pool, _target_aspect(layer), layer.pool_bias, rng,
+        crop_spec=layer.crop, tones_spec=layer.tones, dark_bias=layer.pool_dark_bias,
+    )
 
 
 def _target_aspect(layer: Layer):

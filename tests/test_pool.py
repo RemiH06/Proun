@@ -8,6 +8,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from PIL import Image
+
 from proun import pool
 from proun.errors import SpecError
 
@@ -91,6 +93,73 @@ class ConAspecto(unittest.TestCase):
         a = pool.choose(candidatas(), 3.0, 2.0, rng(9))
         b = pool.choose(candidatas(), 3.0, 2.0, rng(9))
         self.assertEqual(a, b)
+
+
+class PesoPorOscuridad(unittest.TestCase):
+    def mixta(self):
+        """Mitad superior clara, mitad inferior oscura: el mismo archivo da
+        resultados opuestos según qué mitad se le pida."""
+        d = RAIZ / "mixta"
+        d.mkdir(exist_ok=True)
+        ruta = d / "mixta.jpg"
+        if not ruta.exists():
+            im = Image.new("RGB", (200, 200))
+            px = im.load()
+            for y in range(200):
+                for x in range(200):
+                    px[x, y] = (230, 225, 215) if y < 100 else (20, 18, 15)
+            im.save(ruta)
+        siempre_clara = d / "siempre_clara.jpg"
+        if not siempre_clara.exists():
+            Image.new("RGB", (200, 200), (220, 215, 205)).save(siempre_clara)
+        return (ruta, siempre_clara)
+
+    def test_evita_el_recorte_que_sale_oscuro(self):
+        candidatas = self.mixta()
+        crop_oscuro = {"box": [0, 0.5, 1.0, 0.5]}
+        conteos = {p.name: 0 for p in candidatas}
+        r = rng(1)
+        for _ in range(400):
+            elegido = pool.choose(candidatas, None, 2.0, r, crop_spec=crop_oscuro,
+                                  tones_spec=True, dark_bias=3.0)
+            conteos[elegido.name] += 1
+        self.assertLess(conteos["mixta.jpg"], conteos["siempre_clara.jpg"] / 3)
+
+    def test_no_penaliza_el_recorte_que_sale_claro(self):
+        candidatas = self.mixta()
+        crop_claro = {"box": [0, 0.0, 1.0, 0.5]}
+        conteos = {p.name: 0 for p in candidatas}
+        r = rng(2)
+        for _ in range(400):
+            elegido = pool.choose(candidatas, None, 2.0, r, crop_spec=crop_claro,
+                                  tones_spec=True, dark_bias=3.0)
+            conteos[elegido.name] += 1
+        # Ambas deberían salir con frecuencia parecida: las dos son claras.
+        self.assertGreater(conteos["mixta.jpg"], 100)
+
+    def test_apagado_por_defecto_no_cambia_nada(self):
+        # dark_bias=0 es el default: mismo comportamiento que antes de que
+        # existiera esta función.
+        candidatas = self.mixta()
+        crop_oscuro = {"box": [0, 0.5, 1.0, 0.5]}
+        a = pool.choose(candidatas, None, 2.0, rng(5), crop_spec=crop_oscuro,
+                        tones_spec=True, dark_bias=0.0)
+        b = rng(5).choice(candidatas)
+        self.assertEqual(a, b)
+
+    def test_mas_dark_bias_es_mas_severo(self):
+        candidatas = self.mixta()
+        crop_oscuro = {"box": [0, 0.5, 1.0, 0.5]}
+        def cuenta_mixta(bias):
+            r = rng(3)
+            return sum(
+                pool.choose(candidatas, None, 2.0, r, crop_spec=crop_oscuro,
+                           tones_spec=True, dark_bias=bias).name == "mixta.jpg"
+                for _ in range(300)
+            )
+        suave = cuenta_mixta(0.5)
+        fuerte = cuenta_mixta(5.0)
+        self.assertGreaterEqual(suave, fuerte)
 
 
 class Validacion(unittest.TestCase):

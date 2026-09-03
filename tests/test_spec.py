@@ -362,6 +362,19 @@ class Pools(unittest.TestCase):
             with self.assertRaises(SpecError, msg=malo):
                 spec.build(base(sources=[{"pool": str(FUENTES), "pool_bias": malo}]))
 
+    def test_pool_dark_bias_por_defecto_es_cero(self):
+        config = spec.build(base(sources=[{"pool": str(FUENTES)}]))
+        self.assertEqual(config.sources[0].pool_dark_bias, 0.0)
+
+    def test_pool_dark_bias_explicito(self):
+        config = spec.build(base(sources=[{"pool": str(FUENTES), "pool_dark_bias": 3}]))
+        self.assertEqual(config.sources[0].pool_dark_bias, 3.0)
+
+    def test_pool_dark_bias_invalido(self):
+        for malo in (-1, "alto", True):
+            with self.assertRaises(SpecError, msg=malo):
+                spec.build(base(sources=[{"pool": str(FUENTES), "pool_dark_bias": malo}]))
+
     def test_copies_da_varias_capas_cada_una_con_su_propio_pool(self):
         config = spec.build(base(sources=[{"pool": str(FUENTES), "copies": 3}]))
         self.assertEqual(len(config.sources), 3)

@@ -21,7 +21,7 @@ LAYER_KEYS = {
     "recolor", "color",
     "opacity", "blend", "position", "anchor", "region", "bleed", "copies",
     "repeat", "cover", "shape", "outline", "rate", "overlap", "text",
-    "pool", "pool_bias",
+    "pool", "pool_bias", "pool_dark_bias",
 }
 
 SPEC_KEYS = {
@@ -43,6 +43,7 @@ class Layer:
     text: object = None
     pool: object = None
     pool_bias: float = 2.0
+    pool_dark_bias: float = 0.0
     crop: object = None
     resize: object = None
     mosaic: object = None
@@ -432,8 +433,14 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
             bias = merged.get("pool_bias", 2.0)
             if isinstance(bias, bool) or not isinstance(bias, (int, float)) or bias <= 0:
                 raise SpecError(f"pool_bias debe ser un número positivo, llegó {bias!r}")
+            dark_bias = merged.get("pool_dark_bias", 0.0)
+            if isinstance(dark_bias, bool) or not isinstance(dark_bias, (int, float))                     or dark_bias < 0:
+                raise SpecError(
+                    f"pool_dark_bias debe ser un número no negativo, llegó {dark_bias!r}"
+                )
             for _ in range(copies):
-                layers.append(Layer(pool=tuple(candidatas), pool_bias=float(bias), **comun))
+                layers.append(Layer(pool=tuple(candidatas), pool_bias=float(bias),
+                                    pool_dark_bias=float(dark_bias), **comun))
             continue
 
         paths = loading.expand(entry["src"])
