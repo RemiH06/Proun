@@ -1,0 +1,124 @@
+{
+  "output": "wallpapers/proun_ss4",
+  "resolutions": [
+    "1920x1080"
+  ],
+  "colors": [
+    "#d94f3d"
+  ],
+  "seeds": [
+    35290012
+  ],
+  "background": {
+    "gradient": [
+      "auto_dark",
+      "#0e0e10"
+    ],
+    "direction": "diagonal"
+  },
+  "layers": {
+    "min": 4,
+    "max": 6
+  },
+  "layout": {
+    "mode": "grid",
+    "jitter": 0.22,
+    "bleed": 0.1,
+    "size": [
+      0.42,
+      0.62
+    ]
+  },
+  "finish": {
+    "grain": 0.03,
+    "contrast": 1.1
+  },
+  "defaults": {
+    "rotate": "random",
+    "tones": {
+      "normalize": true,
+      "cutoff": 3
+    },
+    "recolor": {
+      "mode": "duotone",
+      "shadow": "#111013"
+    },
+    "blend": "normal"
+  },
+  "sources": [
+    {
+      "src": "fuentes/Museos/wall.JPG",
+      "cover": true,
+      "opacity": 0.5,
+      "recolor": {
+        "mode": "duotone",
+        "strength": 0.9
+      },
+      "stain": {
+        "amount": 0.5,
+        "scale": 0.6,
+        "edges": 0.4
+      }
+    },
+    "fuentes/Museos/sabertooth.JPG",
+    "fuentes/Museos/crouch.JPG",
+    "fuentes/Museos/three.JPG",
+    "fuentes/Museos/stones.JPG",
+    "fuentes/Museos/teeth.JPG",
+    {
+      "src": "fuentes/Museos/tut.JPG",
+      "crop": {
+        "aspect": "1:2",
+        "anchor": "center"
+      }
+    },
+    {
+      "src": "fuentes/Museos/squares.JPG",
+      "rotate": null,
+      "repeat": {
+        "step": [
+          0.5,
+          0
+        ],
+        "times": 2,
+        "fade": 0.15
+      }
+    },
+    {
+      "src": "fuentes/Museos/tests.JPG",
+      "rotate": null,
+      "repeat": {
+        "step": [
+          0.5,
+          0
+        ],
+        "times": 2,
+        "fade": 0.15
+      }
+    },
+    {
+      "src": "fuentes/Museos/golden2.JPG",
+      "rotate": null,
+      "repeat": {
+        "step": [
+          0.5,
+          0
+        ],
+        "times": 2,
+        "fade": 0.15
+      }
+    },
+    {
+      "src": "fuentes/Museos/small.JPG",
+      "color": "#f2f0e6",
+      "opacity": 0.95,
+      "resize": {
+        "size": [
+          0.3,
+          0.3
+        ],
+        "mode": "fill"
+      }
+    }
+  ]
+}

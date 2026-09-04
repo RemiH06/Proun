@@ -43,7 +43,7 @@
   },
   "sources": [
     {
-      "pool": "fuentes/Stains",
+      "pool": "../fuentes/Stains",
       "cover": true,
       "copies": 2,
       "tones": {
@@ -60,7 +60,7 @@
       "blend": "multiply"
     },
     {
-      "src": "fuentes/Museos/wall.JPG",
+      "src": "../fuentes/Museos/wall.JPG",
       "position": [
         0.0,
         0.0
@@ -81,7 +81,7 @@
       "opacity": 0.5
     },
     {
-      "src": "fuentes/Museos/dome.JPG",
+      "src": "../fuentes/Museos/dome.JPG",
       "position": [
         0.42,
         0.0
@@ -102,7 +102,7 @@
       "opacity": 0.5
     },
     {
-      "src": "fuentes/Museos/stones.JPG",
+      "src": "../fuentes/Museos/stones.JPG",
       "position": [
         1.0,
         0.15
@@ -123,7 +123,7 @@
       "opacity": 0.5
     },
     {
-      "src": "fuentes/Museos/vessels.JPG",
+      "src": "../fuentes/Museos/vessels.JPG",
       "position": [
         0.35,
         1.0
@@ -144,7 +144,7 @@
       "opacity": 0.5
     },
     {
-      "pool": "fuentes/Museos",
+      "pool": "../fuentes/Museos",
       "position": [
         0.16,
         0.12
@@ -169,7 +169,7 @@
       }
     },
     {
-      "pool": "fuentes/Museos",
+      "pool": "../fuentes/Museos",
       "position": [
         0.0,
         1.0
@@ -194,7 +194,7 @@
       }
     },
     {
-      "src": "fuentes/Bio/*.png",
+      "src": "../fuentes/Bio/*.png",
       "position": [
         0.28,
         0.47
@@ -219,7 +219,7 @@
       }
     },
     {
-      "src": "fuentes2/Bio/snail_cyanotype.png",
+      "src": "../fuentes2/Bio/snail_cyanotype.png",
       "position": [
         0.83,
         0.03
@@ -250,7 +250,7 @@
       }
     },
     {
-      "pool": "fuentes/Museos",
+      "pool": "../fuentes/Museos",
       "crop": {
         "aspect": "5:1",
         "anchor": "center",
@@ -269,7 +269,7 @@
       }
     },
     {
-      "src": "fuentes/Museos/flowers.JPG",
+      "src": "../fuentes/Museos/flowers.JPG",
       "region": [
         0.38,
         0.08,
@@ -285,7 +285,7 @@
       "opacity": 0.75
     },
     {
-      "src": "fuentes/Museos/crouch.JPG",
+      "src": "../fuentes/Museos/crouch.JPG",
       "region": [
         0.38,
         0.08,
@@ -302,7 +302,7 @@
       "blend": "screen"
     },
     {
-      "src": "fuentes/Museos/three.JPG",
+      "src": "../fuentes/Museos/three.JPG",
       "region": [
         0.38,
         0.08,
@@ -340,7 +340,7 @@
       "opacity": 0.9
     },
     {
-      "src": "fuentes/Museos/golden.JPG",
+      "src": "../fuentes/Museos/golden.JPG",
       "crop": {
         "aspect": "4:3",
         "anchor": "top",
@@ -348,14 +348,14 @@
       }
     },
     {
-      "src": "fuentes/Museos/golden2.JPG",
+      "src": "../fuentes/Museos/golden2.JPG",
       "crop": {
         "aspect": "1:1",
         "auto_rotate": true
       }
     },
     {
-      "src": "fuentes/Museos/small.JPG",
+      "src": "../fuentes/Museos/small.JPG",
       "crop": {
         "aspect": "16:9",
         "anchor": "center",
@@ -363,7 +363,7 @@
       }
     },
     {
-      "src": "fuentes/Museos/squares.JPG",
+      "src": "../fuentes/Museos/squares.JPG",
       "crop": {
         "aspect": "1:1",
         "anchor": "left",
@@ -371,7 +371,7 @@
       }
     },
     {
-      "src": "fuentes/Museos/tests.JPG",
+      "src": "../fuentes/Museos/tests.JPG",
       "crop": {
         "aspect": "3:4",
         "anchor": "top",
@@ -379,20 +379,20 @@
       }
     },
     {
-      "src": "fuentes/Museos/yellow.JPG",
+      "src": "../fuentes/Museos/yellow.JPG",
       "crop": {
         "margin": 0.1
       }
     },
     {
-      "src": "fuentes/Museos/flowers.JPG",
+      "src": "../fuentes/Museos/flowers.JPG",
       "crop": {
         "aspect": "4:3",
         "auto_rotate": true
       }
     },
     {
-      "src": "fuentes/Museos/golden.JPG",
+      "src": "../fuentes/Museos/golden.JPG",
       "crop": {
         "aspect": "16:9",
         "anchor": "bottom",

@@ -35,7 +35,8 @@ que un Proun: un plano de tránsito y no necesariamente arte.
 ```diff
 - Warnings
 ```
-La normalización de paleta es agresiva por diseño. Espera que se lo digas si
+
+La normalización de paleta es agresiva por diseño: espera que se lo digas si
 el resultado te parece demasiado uniforme. `PENDIENTES.md` documenta cada
 límite conocido en vez de esconderlo.
 
@@ -75,6 +76,19 @@ herramienta de escritorio que lee imágenes y escribe imágenes.
 - `--overwrite` / `--dry-run` / `--quiet`
 
 Todas documentadas con `python main.py --help`.
+
+## Screenshots
+
+<p>
+  <img src="docs/images/proun_ss1.png" alt="Collage alineado, bordes compartidos tipo estantería" width="49%">
+  <img src="docs/images/proun_ss2.png" alt="Registro vitrina, luz sobre oscuridad" width="49%">
+</p>
+<p>
+  <img src="docs/images/proun_ss3.png" alt="Registro tinta, el fotograma sobre papel" width="49%">
+  <img src="docs/images/proun_ss4.png" alt="Registro retícula, constructivista" width="49%">
+</p>
+
+Documentación con más ejemplos en [remih06.github.io/Proun](https://remih06.github.io/Proun/).
 
 ## Features
 

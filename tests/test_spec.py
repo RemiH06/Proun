@@ -325,6 +325,43 @@ class Textos(unittest.TestCase):
         self.assertEqual(len(config.sources), 3)
 
 
+class RutasRelativas(unittest.TestCase):
+    def test_src_se_resuelve_junto_al_archivo_de_especificacion(self):
+        raiz = Path(tempfile.mkdtemp())
+        (raiz / "sub").mkdir()
+        (raiz / "sub" / "a.json").write_text(
+            json.dumps({"sources": ["../fuentes/a.png"]}), encoding="utf-8"
+        )
+        (raiz / "fuentes").mkdir()
+        (raiz / "fuentes" / "a.png").write_bytes(b"")
+        datos = spec.load(raiz / "sub" / "a.json")
+        self.assertEqual(Path(datos["sources"][0]).resolve(), (raiz / "fuentes" / "a.png").resolve())
+
+    def test_pool_se_resuelve_igual_que_src(self):
+        raiz = Path(tempfile.mkdtemp())
+        (raiz / "sub").mkdir()
+        (raiz / "sub" / "a.json").write_text(
+            json.dumps({"sources": [{"pool": "../fuentes"}]}), encoding="utf-8"
+        )
+        (raiz / "fuentes").mkdir()
+        (raiz / "fuentes" / "a.png").write_bytes(b"")
+        datos = spec.load(raiz / "sub" / "a.json")
+        self.assertEqual(Path(datos["sources"][0]["pool"]).resolve(), (raiz / "fuentes").resolve())
+
+    def test_pool_como_lista_tambien_se_resuelve(self):
+        raiz = Path(tempfile.mkdtemp())
+        (raiz / "sub").mkdir()
+        (raiz / "sub" / "a.json").write_text(
+            json.dumps({"sources": [{"pool": ["../fuentes/a.png", "../fuentes/b.png"]}]}),
+            encoding="utf-8",
+        )
+        (raiz / "fuentes").mkdir()
+        datos = spec.load(raiz / "sub" / "a.json")
+        resultado = [Path(p).resolve() for p in datos["sources"][0]["pool"]]
+        esperado = [(raiz / "fuentes/a.png").resolve(), (raiz / "fuentes/b.png").resolve()]
+        self.assertEqual(resultado, esperado)
+
+
 class Pools(unittest.TestCase):
     def test_un_pool_no_se_reparte_en_una_capa_por_archivo(self):
         # A diferencia de src, todo el glob es UNA sola capa.

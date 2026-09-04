@@ -160,7 +160,12 @@ def build(data: dict) -> Spec:
 
 
 def _relative_sources(data: dict, base: Path) -> dict:
-    """Las rutas del archivo de especificación se resuelven junto a él."""
+    """Las rutas del archivo de especificación se resuelven junto a él.
+
+    Se aplica por igual a `src` y a `pool`: son dos formas de declarar de
+    dónde sale una imagen, y no había razón para que una se resolviera sola
+    y la otra no.
+    """
     def fix(value):
         path = Path(str(value)).expanduser()
         return str(path if path.is_absolute() else base / path)
@@ -171,8 +176,17 @@ def _relative_sources(data: dict, base: Path) -> dict:
         for item in out["sources"]:
             if isinstance(item, str):
                 fixed.append(fix(item))
-            elif isinstance(item, dict) and "src" in item:
-                fixed.append({**item, "src": fix(item["src"])})
+            elif isinstance(item, dict) and ("src" in item or "pool" in item):
+                nuevo = dict(item)
+                if "src" in nuevo:
+                    nuevo["src"] = fix(nuevo["src"])
+                if "pool" in nuevo:
+                    pool = nuevo["pool"]
+                    if isinstance(pool, str):
+                        nuevo["pool"] = fix(pool)
+                    elif isinstance(pool, list):
+                        nuevo["pool"] = [fix(p) if isinstance(p, str) else p for p in pool]
+                fixed.append(nuevo)
             else:
                 fixed.append(item)
         out["sources"] = fixed

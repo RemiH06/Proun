@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proun: generador de wallpapers tipo collage</title>
+<meta name="description" content="Proun genera wallpapers de collage con paleta normalizada, inspirado en el fotomontaje constructivista de El Lissitzky. Sin dependencias más allá de Pillow.">
+
+<style>
+  @font-face {
+    font-family: "Big Shoulders";
+    src: url("../proun/assets/fonts/BigShoulders-Bold.ttf") format("truetype");
+    font-weight: 700;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Big Shoulders";
+    src: url("../proun/assets/fonts/BigShoulders-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  :root {
+    --paper: #f2efe8;
+    --paper-dim: #e8e3d6;
+    --ink: #141210;
+    --red: #d94f3d;
+    --grey: #6b6156;
+    --line: #cabfad;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --display: "Big Shoulders", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.6;
+  }
+
+  a { color: var(--red); }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+
+  .wrap {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  /* ---------- header ---------- */
+
+  /* Secuencia: las dos puertas naranjas ya están cerradas y visibles desde
+  el arranque (se traen a su lugar en el mismo golpe que agrega la clase,
+  seguro porque solo pasa si el import tuvo éxito). Encima, una línea negra
+  crece desde el centro, de forma errante, hasta tocar arriba y abajo.
+  Recién entonces la línea se oculta y las puertas se separan hacia los
+  lados. Por defecto todo está invisible o fuera de pantalla: si el script
+  nunca corre, la página se ve normal desde el primer pintado. */
+  #page-intro {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    pointer-events: none;
+  }
+
+  .intro-half {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 50%;
+    background: var(--red);
+  }
+
+  .intro-left { left: 0; transform: translateX(-100%); }
+  .intro-right { right: 0; transform: translateX(100%); }
+
+  .js-intro .intro-left { transform: translateX(0); }
+  .js-intro .intro-right { transform: translateX(0); }
+
+  /* Puertas auxiliares: mucho más chicas que las laterales, arriba y abajo
+  del todo. La barra negra ya no necesita llegar a los bordes: se detiene
+  un poco antes, y estas dos se abren justo ahí como remate. */
+  .intro-cap {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 5%;
+    background: var(--red);
+  }
+
+  .intro-cap-top { top: 0; transform: translateY(-100%); }
+  .intro-cap-bottom { bottom: 0; transform: translateY(100%); }
+
+  .js-intro .intro-cap-top { transform: translateY(0); }
+  .js-intro .intro-cap-bottom { transform: translateY(0); }
+
+  .intro-line {
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    transform: scale(0.006, 0.02);
+    transform-origin: center;
+    opacity: 0;
+  }
+
+  .js-intro .intro-line { opacity: 1; }
+
+  .hero-pin-wrap { position: relative; }
+
+  /* Sin JS, el header es un bloque normal de una pantalla, como antes: se
+  aleja al hacer scroll sin dejar hueco. Con JS (clase agregada por el
+  script, solo si el import de Motion tuvo éxito), el envoltorio crece a
+  tres pantallas y el header se fija adentro, dando espacio para que el
+  desenfoque aparezca, se sostenga el doble de tiempo, y recién entonces la
+  imagen se aleje un poco. */
+  .js-pin .hero-pin-wrap { height: 300vh; }
+
+  header {
+    position: relative;
+    height: 100vh;
+    min-height: 620px;
+    max-height: 980px;
+    overflow: hidden;
+    border-bottom: 3px solid var(--ink);
+    isolation: isolate;
+  }
+
+  .js-pin header {
+    position: sticky;
+    top: 0;
+  }
+
+  .hero-media {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .hero-media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 30%;
+    filter: grayscale(0.15) blur(0px);
+    will-change: filter;
+  }
+
+  .hero-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 18, 16, 0.4);
+  }
+
+  .hero-text {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 28px;
+    will-change: opacity, transform;
+  }
+
+  .hero-title {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(64px, 15vw, 200px);
+    line-height: 0.9;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: var(--paper);
+    margin: 0;
+  }
+
+  .hero-subtitle {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(15px, 2vw, 19px);
+    letter-spacing: 0.02em;
+    color: var(--paper-dim);
+    max-width: 30em;
+    margin: 18px 0 0;
+  }
+
+  .hero-credit {
+    position: absolute;
+    z-index: 2;
+    right: 28px;
+    bottom: 22px;
+    font-family: var(--display);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    color: var(--paper-dim);
+  }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    padding: 72px 0 48px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 48px;
+    align-items: start;
+  }
+
+  @media (max-width: 760px) {
+    .hero-grid { grid-template-columns: 1fr; }
+  }
+
+  .hero h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(32px, 4.6vw, 48px);
+    line-height: 1.08;
+    margin: 0 0 20px;
+    max-width: 14em;
+  }
+
+  .hero p { margin: 0 0 16px; }
+
+  .quote {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 22px;
+    line-height: 1.4;
+    border-left: 3px solid var(--red);
+    padding-left: 20px;
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .quote cite {
+    display: block;
+    font-family: var(--serif);
+    font-style: normal;
+    font-size: 15px;
+    color: var(--grey);
+    margin-top: 10px;
+  }
+
+  /* ---------- galería ---------- */
+
+  .gallery-section { padding: 64px 0 88px; }
+
+  .gallery-heading {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    color: var(--grey);
+    margin: 0 0 40px;
+  }
+
+  .gallery {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 0;
+    padding: 20px 0 40px;
+  }
+
+  .gallery figure {
+    margin: 0;
+    position: relative;
+    box-shadow: 0 0 0 1px var(--ink);
+  }
+
+  .gallery img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .gallery figcaption {
+    font-family: var(--display);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: var(--grey);
+    margin-top: 10px;
+  }
+
+  .g1 { grid-column: 1 / 8; transform: rotate(-1.1deg); z-index: 3; }
+  .g2 { grid-column: 7 / 13; margin-top: 90px; transform: rotate(0.8deg); z-index: 2; }
+  .g3 { grid-column: 2 / 7; margin-top: 60px; transform: rotate(0.6deg); z-index: 1; }
+  .g4 { grid-column: 6 / 12; margin-top: 20px; transform: rotate(-0.7deg); z-index: 2; }
+
+  @media (max-width: 760px) {
+    .gallery { grid-template-columns: 1fr; row-gap: 32px; }
+    .g1, .g2, .g3, .g4 {
+      grid-column: 1 / -1;
+      margin-top: 0;
+      transform: none;
+    }
+  }
+
+  .gallery figure { will-change: transform, opacity; }
+
+  /* ---------- acerca ---------- */
+
+  .about {
+    padding: 64px 0;
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .about .wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+  }
+
+  @media (max-width: 760px) {
+    .about .wrap { grid-template-columns: 1fr; }
+  }
+
+  .about h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 28px;
+    margin: 0 0 18px;
+  }
+
+  .about p { color: #d8d2c4; }
+  .about a { color: var(--red); }
+
+  /* ---------- features ---------- */
+
+  /* ---------- tabs + stage ---------- */
+
+  .stage-section {
+    padding: 0 0 80px;
+    background: var(--paper-dim);
+    border-top: 1px solid var(--line);
+    border-bottom: 3px solid var(--ink);
+  }
+
+  .tabs {
+    position: relative;
+    display: flex;
+    gap: 0;
+    flex-wrap: wrap;
+    background: var(--ink);
+    padding: 0 40px;
+  }
+
+  .tab {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 17px;
+    background: none;
+    border: 0;
+    padding: 16px 4px;
+    margin-right: 32px;
+    color: var(--paper-dim);
+    cursor: pointer;
+  }
+
+  .tab:hover { color: var(--paper); }
+
+  .tab[aria-selected="true"] { color: var(--paper); }
+
+  .tab:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
+
+  .tab-indicator {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 3px;
+    background: var(--red);
+  }
+
+  .stage {
+    position: relative;
+    padding: 40px 40px 0;
+  }
+
+  .panel[hidden] { display: none; }
+
+  .panel-dark {
+    background: var(--ink);
+    color: var(--paper);
+    margin: 0 -40px;
+    padding: 36px 40px;
+  }
+
+  .panel-intro {
+    max-width: 42em;
+    color: #d8d2c4;
+    margin: 0 0 36px;
+  }
+
+  .feature-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .feature-list li {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 24px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  @media (max-width: 640px) {
+    .feature-list li { grid-template-columns: 1fr; gap: 6px; }
+  }
+
+  .feature-list dt {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 19px;
+  }
+
+  .feature-list dd { margin: 0; color: var(--grey); }
+
+  /* ---------- cortina (shutter), una sola, para el cambio de tab --------- */
+
+  .shutter {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    pointer-events: none;
+  }
+
+  .shutter .blade {
+    flex: 1 0 0;
+    background: var(--red);
+    transform-origin: top;
+    transform: scaleY(0);
+  }
+
+  .config-list {
+    display: grid;
+    gap: 20px;
+    margin: 0 0 32px;
+  }
+
+  .config-item {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 18px;
+    padding: 18px 0;
+    border-top: 1px solid #3a352f;
+  }
+
+  @media (max-width: 640px) {
+    .config-item { grid-template-columns: 1fr; gap: 6px; }
+  }
+
+  .config-item code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 15px;
+    color: var(--red);
+    align-self: start;
+  }
+
+  .config-item p { margin: 0; color: #d8d2c4; }
+
+  .panel-dark pre {
+    background: #0a0908;
+    border: 1px solid #3a352f;
+  }
+
+  .steps {
+    counter-reset: step;
+    display: grid;
+    gap: 28px;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .step-number {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 40px;
+    line-height: 1;
+    color: var(--red);
+  }
+
+  .step h3 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 19px;
+    margin: 0 0 8px;
+  }
+
+  .step p { margin: 0 0 10px; color: var(--ink); }
+
+  code, pre {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 15px;
+  }
+
+  pre {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 14px 18px;
+    overflow-x: auto;
+    margin: 0;
+  }
+
+  code.inline {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 1px 6px;
+    color: var(--ink);
+  }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    padding: 40px 0 56px;
+  }
+
+  .footer-row {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 14px;
+    color: var(--grey);
+  }
+
+  .footer-row a { color: var(--ink); }
+
+  .footer-note {
+    margin: 24px 0 0;
+    max-width: 40em;
+    font-size: 14px;
+    color: var(--grey);
+  }
+</style>
+</head>
+<body>
+<div id="page-intro" aria-hidden="true">
+  <div class="intro-half intro-left"></div>
+  <div class="intro-half intro-right"></div>
+  <div class="intro-cap intro-cap-top"></div>
+  <div class="intro-cap intro-cap-bottom"></div>
+  <div class="intro-line"></div>
+</div>
+<div class="hero-pin-wrap" id="hero-pin-wrap">
+<header id="hero-header">
+  <div class="hero-media" aria-hidden="true">
+    <img src="images/proun_ss1.png" alt="">
+    <div class="hero-scrim"></div>
+  </div>
+  <div class="hero-text">
+    <h1 class="hero-title">Proun</h1>
+    <p class="hero-subtitle">Genera un wallpaper a partir de imágenes de tu galería.</p>
+  </div>
+  <span class="hero-credit">v1.0 · by Hex (@RemiH06)</span>
+</header>
+</div>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>La estación de trasbordo entre tu archivo personal y una sola paleta</h1>
+      <p>Proun toma imágenes de cualquier origen (una radiografía de museo, una foto de la prepa, un cianotipo de 1843) y las obliga a existir en el mismo registro tonal. No decora tus fotos: las recompone.</p>
+      <p>Corre por línea de comandos o editando un archivo de configuración en Python. Sin dependencias más allá de Pillow. Cada wallpaper lleva su semilla en el nombre, así que cualquiera se puede regenerar exacto.</p>
+    </div>
+    <blockquote class="quote">
+      &ldquo;La estación de trasbordo entre la pintura y la arquitectura.&rdquo;
+      <cite>El Lissitzky, sobre sus Proun, 1919</cite>
+    </blockquote>
+  </div>
+</section>
+
+<section class="gallery-section">
+  <div class="wrap">
+    <p class="gallery-heading">Cuatro registros de la misma herramienta</p>
+    <div class="gallery">
+      <figure class="g1" data-rotate="-1.1">
+        <img src="images/proun_ss1.png" alt="Collage denso de fotos de museo, radiografías y cianotipos, empaquetados en una banda con papel vacío alrededor" loading="lazy">
+        <figcaption>Alineada, bordes compartidos, tipo estantería</figcaption>
+      </figure>
+      <figure class="g2" data-rotate="0.8">
+        <img src="images/proun_ss2.png" alt="Radiografías y esqueletos en luz sobre fondo oscuro, con vignette" loading="lazy">
+        <figcaption>Vitrina, luz sobre oscuridad</figcaption>
+      </figure>
+      <figure class="g3" data-rotate="0.6">
+        <img src="images/proun_ss3.png" alt="Fotos convertidas a tinta oscura acumulándose sobre papel claro" loading="lazy">
+        <figcaption>Tinta, el registro de fotograma</figcaption>
+      </figure>
+      <figure class="g4" data-rotate="-0.7">
+        <img src="images/proun_ss4.png" alt="Retícula de piezas giradas en múltiplos de noventa grados, en rojo constructivista" loading="lazy">
+        <figcaption>Retícula, el registro constructivista</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="about">
+  <div class="wrap">
+    <div>
+      <h2>Por qué se llama Proun</h2>
+      <p>En 1919, El Lissitzky empezó a llamar Proun a unos objetos que no eran ni cuadros ni edificios. La sigla rusa decía <em>Proyecto para la afirmación de lo nuevo</em>, aunque él prefería explicarlo como la estación de trasbordo entre la pintura y la arquitectura: una estructura que existía en varios planos a la vez.</p>
+      <p>Klutsis, Ródchenko y Kulagina llevaron el mismo principio al fotomontaje: fragmentos fotográficos ajenos, aplanados a una sola tinta, obligados a compartir una superficie que ninguno pedía compartir.</p>
+    </div>
+    <div>
+      <h2>Cómo lo hace</h2>
+      <p>Cada imagen se normaliza tonalmente antes de mapearse a un color. Cualquier color puede volverse transparente: de ahí sale la polaridad, tinta oscura sobre papel o luz sobre oscuridad, del mismo mecanismo.</p>
+      <p>El acomodo puede ser al azar, en cuadrícula, o empaquetado por bordes como una estantería. Las semillas hacen que el mismo wallpaper se pueda regenerar en cualquier resolución o color.</p>
+    </div>
+  </div>
+</section>
+
+<section class="stage-section" id="usar">
+  <div class="tabs" role="tablist" aria-label="Secciones de la herramienta">
+    <button class="tab" role="tab" id="tab-features" aria-controls="panel-features" aria-selected="true" data-index="0">Lo que trae</button>
+    <button class="tab" role="tab" id="tab-install" aria-controls="panel-install" aria-selected="false" tabindex="-1" data-index="1">Instalación</button>
+    <button class="tab" role="tab" id="tab-usage" aria-controls="panel-usage" aria-selected="false" tabindex="-1" data-index="2">Cómo usarlo</button>
+    <div class="tab-indicator" aria-hidden="true"></div>
+  </div>
+
+  <div class="stage">
+      <div class="shutter" aria-hidden="true">
+        <div class="blade"></div><div class="blade"></div><div class="blade"></div>
+        <div class="blade"></div><div class="blade"></div><div class="blade"></div>
+      </div>
+
+      <div class="panel" id="panel-features" role="tabpanel" aria-labelledby="tab-features">
+        <dl class="feature-list">
+          <li>
+            <dt>Paleta normalizada</dt>
+            <dd>Cualquier color puede volverse transparente, y de ahí sale la polaridad de tinta sobre papel o de luz sobre oscuridad.</dd>
+          </li>
+          <li>
+            <dt>Mosaico y repetición</dt>
+            <dd>Repetición por proporciones con espejado y giro acumulado, distinto del mosaico que llena un área sin solaparse.</dd>
+          </li>
+          <li>
+            <dt>Figuras y texto generados</dt>
+            <dd>Rect, circle, triangle, diamond, polygon; y texto con fuente empaquetada, sin depender de lo que tenga instalado el sistema.</dd>
+          </li>
+          <li>
+            <dt>Manchas de verdad</dt>
+            <dd>Ruido de nubes por octavas, o fotografías reales de foxing y humedad, por capa o sobre el fondo entero.</dd>
+          </li>
+          <li>
+            <dt>Composición alineada</dt>
+            <dd>Empaquetado tipo estantería con skyline bottom-left: cada pieza toca a sus vecinas, sin solaparse.</dd>
+          </li>
+          <li>
+            <dt>Selección por pool</dt>
+            <dd>Una capa puede tomar su fuente de varias candidatas, sorteadas ponderando qué tan bien calzan el hueco y qué tan oscuro saldría el recorte.</dd>
+          </li>
+          <li>
+            <dt>Reproducible</dt>
+            <dd>El nombre de cada archivo lleva la semilla que lo regenera, en cualquier resolución o color del mismo lote.</dd>
+          </li>
+        </dl>
+      </div>
+
+      <div class="panel" id="panel-install" role="tabpanel" aria-labelledby="tab-install" hidden>
+        <div class="steps">
+          <div class="step">
+            <span class="step-number">1</span>
+            <div>
+              <h3>Instala Pillow</h3>
+              <p>Es la única dependencia.</p>
+              <pre>pip install -r requirements.txt</pre>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-number">2</span>
+            <div>
+              <h3>Pon tus imágenes en <code class="inline">fuentes/</code></h3>
+              <p>O donde prefieras; se declara en la configuración.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-number">3</span>
+            <div>
+              <h3>Corre la herramienta</h3>
+              <pre>python main.py --images fuentes/ --resolutions 1920x1080 --spectrum 6 --count 4</pre>
+              <p>O edita <code class="inline">CONFIG</code> dentro de <code class="inline">main.py</code> y corre <code class="inline">python main.py</code> sin más.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel panel-dark" id="panel-usage" role="tabpanel" aria-labelledby="tab-usage" hidden>
+        <p class="panel-intro">Además de <code class="inline">CONFIG</code> en <code class="inline">main.py</code>, Proun lee especificaciones completas en JSON con <code class="inline">--spec</code>. Es la misma estructura de datos en los dos casos; el JSON solo evita abrir un editor de Python. Los tres viven en <code class="inline">json/</code>.</p>
+        <dl class="config-list">
+          <div class="config-item">
+            <code>json/exp.json</code>
+            <p>Varios parámetros activados a la vez (crop, giro libre, repetición espejada, mancha propia, transparencia) para comparar el efecto acumulado.</p>
+          </div>
+          <div class="config-item">
+            <code>json/examen.json</code>
+            <p>La receta completa que reconstruye el fondo de referencia: manchas reales, radiografías, cianotipos, el bloque alineado.</p>
+          </div>
+          <div class="config-item">
+            <code>json/proun_ss4.json</code>
+            <p>Una receta con la semilla fija: siempre reproduce el mismo wallpaper, byte por byte.</p>
+          </div>
+        </dl>
+        <pre>python main.py --spec json/exp.json</pre>
+      </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-row">
+      <span>Proun</span>
+      <a href="https://github.com/RemiH06/Proun">github.com/RemiH06/Proun</a>
+      <span>Licencia MIT</span>
+    </div>
+    <p class="footer-note">Los cianotipos y el vocabulario visual de esta documentación no están afiliados con la obra de El Lissitzky ni con su sucesión; es una referencia y un homenaje, no una atribución de autoría.</p>
+  </div>
+</footer>
+
+<script type="module">
+  import { animate, inView, scroll } from "https://cdn.jsdelivr.net/npm/motion@11/+esm";
+
+  // El pin del hero (sticky de tres pantallas) solo se activa si esta
+  // línea llega a correr, es decir, si el import de arriba tuvo éxito. Sin
+  // esto, .hero-pin-wrap no crece y header no se fija: todo se comporta
+  // como un bloque normal de una pantalla, igual que antes.
+  document.documentElement.classList.add("js-pin");
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // --- intro, en dos tiempos, 50% más lento que la primera versión. Las
+  // puertas naranjas ya están cerradas desde el arranque (visibles de
+  // inmediato, seguro porque solo pasa si el import tuvo éxito). Encima,
+  // una línea negra crece desde el centro, de forma errante, pero ya no
+  // necesita tocar los bordes: se detiene al 90% de la altura, dejando un
+  // 5% de margen arriba y abajo. Ahí se oculta, y las puertas auxiliares
+  // (del tamaño exacto de ese margen) se abren junto con las laterales, al
+  // mismo tiempo y con la misma duración: las cuatro terminan a la vez.
+  // animate() se llama en el mismo golpe síncrono que agrega la clase, así
+  // que una vez que arranca, el motor nativo termina cada tramo aunque
+  // algo después falle.
+  const intro = document.getElementById("page-intro");
+  const introLine = document.querySelector(".intro-line");
+  const introLeft = document.querySelector(".intro-left");
+  const introRight = document.querySelector(".intro-right");
+  const introCapTop = document.querySelector(".intro-cap-top");
+  const introCapBottom = document.querySelector(".intro-cap-bottom");
+  if (intro && introLine && introLeft && introRight && introCapTop && introCapBottom) {
+    if (reduced) {
+      intro.style.display = "none";
+    } else {
+      document.documentElement.classList.add("js-intro");
+      (async () => {
+        await animate(
+          introLine,
+          { scaleY: [0.02, 0.02, 0.27, 0.27, 0.27, 0.52, 0.52, 0.52, 0.74, 0.74, 0.9, 0.9],
+           scaleX: [0.006, 0.006] },
+          { duration: 0.9, easing: "ease-out" }
+        ).finished;
+        introLine.style.display = "none";
+        await Promise.all([
+          animate(introCapTop, { y: ["0%", "-100%"] },
+                 { duration: 0.9, easing: [0.76, 0, 0.24, 1] }).finished,
+          animate(introCapBottom, { y: ["0%", "100%"] },
+                 { duration: 0.9, easing: [0.76, 0, 0.24, 1] }).finished,
+          animate(introLeft, { x: ["0%", "-100%"] },
+                 { duration: 0.9, easing: [0.76, 0, 0.24, 1] }).finished,
+          animate(introRight, { x: ["0%", "100%"] },
+                 { duration: 0.9, easing: [0.76, 0, 0.24, 1] }).finished,
+        ]);
+        intro.style.display = "none";
+      })();
+    }
+  }
+
+  // --- hero: tres fases sobre las tres pantallas de .hero-pin-wrap.
+  // 0 a 0.25: el título se desvanece hacia arriba y la imagen se desenfoca.
+  // 0.25 a 0.75 (el doble de la rampa anterior): todo se sostiene quieto.
+  // 0.75 a 1: la imagen se aleja un poco (escala hacia abajo) antes de que
+  // el header por fin suelte el scroll y dé paso al resto de la página.
+  const heroImg = document.querySelector(".hero-media img");
+  const heroText = document.querySelector(".hero-text");
+  const heroPinWrap = document.getElementById("hero-pin-wrap");
+  if (heroImg && heroText && heroPinWrap && !reduced) {
+    scroll(
+      (progress) => {
+        let desvanece, mueveY, blur, escala;
+        if (progress <= 0.25) {
+          const t = progress / 0.25;
+          desvanece = 1 - t;
+          mueveY = t * -70;
+          blur = t * 9;
+          escala = 1;
+        } else if (progress <= 0.75) {
+          desvanece = 0;
+          mueveY = -70;
+          blur = 9;
+          escala = 1;
+        } else {
+          const t = (progress - 0.75) / 0.25;
+          desvanece = 0;
+          mueveY = -70;
+          blur = 9;
+          escala = 1 - t * 0.08;
+        }
+        heroText.style.opacity = desvanece;
+        heroText.style.transform = `translateY(${mueveY}px)`;
+        heroImg.style.filter = `grayscale(0.15) blur(${blur}px)`;
+        heroImg.style.transform = `scale(${escala})`;
+      },
+      { target: heroPinWrap, offset: ["start start", "end start"] }
+    );
+  }
+
+  // --- tabs: la cortina solo se anima al cambiar de tab, no al hacer
+  // scroll. Se cierra, se cambia el panel visible por debajo mientras está
+  // tapado, y se vuelve a abrir. Por defecto los blades están en scaleY(0)
+  // (CSS más arriba), así que si este script no llega a correr, los tres
+  // paneles simplemente no se pueden cambiar, pero nada queda tapado.
+  const tabsEl = document.querySelector(".tabs");
+  const tabs = [...document.querySelectorAll(".tab")];
+  const panels = [...document.querySelectorAll(".panel")];
+  const indicator = document.querySelector(".tab-indicator");
+  const stage = document.querySelector(".stage");
+  const blades = document.querySelectorAll(".stage .shutter .blade");
+  let activo = 0;
+  let animando = false;
+
+  // El indicador rojo se desliza hasta la tab activa en vez de aparecer de
+  // golpe (motion.dev/examples/react-smooth-tabs, adaptado a JS vanilla).
+  function moverIndicador(tab, animar) {
+    if (!indicator || !tabsEl || !tab) return;
+    const rectTabs = tabsEl.getBoundingClientRect();
+    const rectTab = tab.getBoundingClientRect();
+    const left = rectTab.left - rectTabs.left;
+    const width = rectTab.width;
+    if (animar && !reduced) {
+      animate(indicator, { left: `${left}px`, width: `${width}px` },
+             { duration: 0.35, easing: [0.65, 0, 0.35, 1] });
+    } else {
+      indicator.style.left = `${left}px`;
+      indicator.style.width = `${width}px`;
+    }
+  }
+
+  // El stage se fija a la altura del panel más alto de los tres, así la
+  // cortina siempre cubre el mismo rectángulo sin importar cuál tab esté
+  // activa: antes cambiaba de tamaño en cada cambio y se veía tosco.
+  function medirAlturaStage() {
+    if (!stage) return;
+    let maxima = 0;
+    panels.forEach((p) => {
+      const oculto = p.hidden;
+      p.hidden = false;
+      maxima = Math.max(maxima, p.scrollHeight);
+      if (oculto) p.hidden = true;
+    });
+    stage.style.minHeight = `${maxima}px`;
+  }
+
+  medirAlturaStage();
+  moverIndicador(tabs[activo], false);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      medirAlturaStage();
+      moverIndicador(tabs[activo], false);
+    });
+  }
+  window.addEventListener("resize", () => {
+    medirAlturaStage();
+    moverIndicador(tabs[activo], false);
+  });
+
+  async function irA(indice) {
+    if (indice === activo || animando) return;
+    animando = true;
+
+    if (!reduced && blades.length) {
+      await animate(
+        blades,
+        { scaleY: 1 },
+        { duration: 0.32, delay: (i) => i * 0.04, easing: [0.65, 0, 0.35, 1] }
+      ).finished;
+    }
+
+    panels[activo].hidden = true;
+    tabs[activo].setAttribute("aria-selected", "false");
+    tabs[activo].tabIndex = -1;
+
+    panels[indice].hidden = false;
+    tabs[indice].setAttribute("aria-selected", "true");
+    tabs[indice].tabIndex = 0;
+    moverIndicador(tabs[indice], true);
+    activo = indice;
+
+    if (!reduced && blades.length) {
+      await animate(
+        blades,
+        { scaleY: 0 },
+        { duration: 0.45, delay: (i) => i * 0.05, easing: [0.22, 1, 0.36, 1] }
+      ).finished;
+    }
+    animando = false;
+  }
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => irA(i));
+    tab.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") irA((i + 1) % tabs.length);
+      if (e.key === "ArrowLeft") irA((i - 1 + tabs.length) % tabs.length);
+    });
+  });
+
+  // --- galería: un solo momento de animación, no una entrada genérica por
+  // sección. Se ensambla como un collage, que es lo que la herramienta hace.
+  const figures = document.querySelectorAll(".gallery figure");
+
+  if (!reduced && figures.length) {
+    inView(".gallery", () => {
+      figures.forEach((fig, i) => {
+        const rest = parseFloat(fig.dataset.rotate || "0");
+        animate(
+          fig,
+          { opacity: [0, 1], y: [26, 0], rotate: [rest * 2.6, rest] },
+          { duration: 0.65, delay: i * 0.1, easing: [0.22, 1, 0.36, 1] }
+        );
+      });
+    }, { amount: 0.35 });
+
+    figures.forEach((fig) => {
+      const rest = parseFloat(fig.dataset.rotate || "0");
+      fig.addEventListener("mouseenter", () => {
+        animate(fig, { rotate: 0, scale: 1.02 }, { duration: 0.3, easing: "ease-out" });
+      });
+      fig.addEventListener("mouseleave", () => {
+        animate(fig, { rotate: rest, scale: 1 }, { duration: 0.35, easing: "ease-out" });
+      });
+    });
+  }
+</script>
+</body>
+</html>

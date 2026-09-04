@@ -13,7 +13,7 @@ uniforme, como cualquier lista.
 Con `dark_bias` (0 por defecto, apagado), se suma un segundo criterio: qué
 tan oscuro saldría el recorte después de `tones`. Es necesario porque la
 misma foto puede dar un recorte bien iluminado en un hueco y un recorte de
-puro piso o sombra en otro — el problema no es el archivo, es qué región de
+puro piso o sombra en otro: el problema no es el archivo, es qué región de
 ese archivo terminó ahí, y eso solo se sabe recortando y midiendo de verdad.
 Por eso, a diferencia del peso por proporción (que solo lee las dimensiones
 de cada candidata), este sí abre y procesa cada una en miniatura.

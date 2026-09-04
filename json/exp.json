@@ -36,7 +36,7 @@
   "sources": [
     {
       "_nota_src": "Cambia esto por el archivo real que quieras usar.",
-      "src": "fuentes/Bio/smalltoothsawfish.png",
+      "src": "../fuentes/Bio/vipermorayeel.png",
       "_nota_crop": "recorte cuadrado, girando si eso deja más imagen.",
       "crop": {
         "aspect": "1:1",
@@ -75,10 +75,10 @@
       },
       "_nota_stain": "mancha visible en esta capa, no en el fondo.",
       "stain": {
-        "amount": 0.4,
-        "scale": 0.3,
-        "edges": 0.5,
-        "threshold": 0.35
+        "amount": 0.75,
+        "scale": 0.22,
+        "edges": 0.7,
+        "threshold": 0.4
       },
       "_nota_tones": "ecualiza además de normalizar, y sube el gamma.",
       "tones": {
@@ -120,6 +120,40 @@
       "cover": false,
       "rate": 1.0,
       "overlap": null
+    },
+    {
+      "_nota": "una foto real de mancha (fuentes/Stains), para comparar contra la radiografía",
+      "src": "../fuentes/Stains/stain6.png",
+      "tones": {
+        "normalize": true,
+        "cutoff": 2,
+        "dominant": "light",
+        "gamma": 1.5
+      },
+      "transparent": {
+        "color": "light",
+        "tolerance": 0.06,
+        "softness": 0.5
+      },
+      "recolor": {
+        "mode": "duotone",
+        "shadow": "#050505",
+        "highlight": "#f0eade"
+      },
+      "resize": {
+        "size": [
+          0.42,
+          0.42
+        ],
+        "mode": "fit"
+      },
+      "position": [
+        0.22,
+        0.72
+      ],
+      "anchor": "center",
+      "opacity": 0.9,
+      "blend": "multiply"
     }
   ]
 }
