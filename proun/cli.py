@@ -131,6 +131,7 @@ def to_data(args: argparse.Namespace, config: dict | None = None,
 
 def run(config: spec_module.Spec, *, overwrite=False, dry_run=False, quiet=False) -> list[Path]:
     written: list[Path] = []
+    config_hash = naming.content_hash(config)
     for offset, seed in enumerate(config.seeds):
         index = config.start_index + offset
         current = compose.plan(config, seed)
@@ -138,7 +139,7 @@ def run(config: spec_module.Spec, *, overwrite=False, dry_run=False, quiet=False
             folder = naming.resolution_dir(config.output, resolution)
             shaped = None
             for color in config.colors:
-                name = naming.filename(index, colors.to_hex(color), seed, config.fmt)
+                name = naming.filename(index, colors.to_hex(color), seed, config.fmt, config_hash)
                 path = folder / name
                 if path.exists() and not overwrite:
                     if not quiet:

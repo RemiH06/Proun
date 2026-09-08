@@ -128,6 +128,58 @@ class Grano(unittest.TestCase):
         self.assertIsNotNone(finish.apply(lienzo(), AZUL, {"vignette": 0.3}))
 
 
+class Mancha(unittest.TestCase):
+    def test_es_reproducible(self):
+        a = finish.apply(lienzo(), AZUL, {"stain": 0.4}, rng(7))
+        b = finish.apply(lienzo(), AZUL, {"stain": 0.4}, rng(7))
+        self.assertEqual(a.tobytes(), b.tobytes())
+
+    def test_semillas_distintas_dan_manchas_distintas(self):
+        a = finish.apply(lienzo(), AZUL, {"stain": 0.4}, rng(7))
+        b = finish.apply(lienzo(), AZUL, {"stain": 0.4}, rng(8))
+        self.assertNotEqual(a.tobytes(), b.tobytes())
+
+    def test_cambia_la_imagen(self):
+        base = lienzo()
+        salida = finish.apply(base, AZUL, {"stain": {"amount": 0.6}}, rng())
+        self.assertNotEqual(salida.tobytes(), base.tobytes())
+
+    def test_cero_no_toca_nada(self):
+        base = lienzo()
+        salida = finish.apply(base, AZUL, {"stain": 0})
+        self.assertEqual(salida.tobytes(), base.tobytes())
+
+    def test_color_explicito(self):
+        salida = finish.apply(lienzo(60), AZUL,
+                              {"stain": {"amount": 1.0, "color": "#ff0000", "scale": 2.0}}, rng())
+        r, g, b = salida.getpixel((0, 0))[:3]
+        self.assertGreater(r, g)
+        self.assertGreater(r, b)
+
+    def test_mancha_papel_y_capas_por_igual(self):
+        # A diferencia de background.stain (solo el fondo), acá corre sobre
+        # el wallpaper ya compuesto: una imagen sin transparencia también se
+        # mancha, no solo lo que hubiera quedado de fondo puro.
+        opaco = Image.new("RGBA", (100, 100), (10, 10, 10, 255))
+        salida = finish.apply(opaco, AZUL, {"stain": {"amount": 0.8, "scale": 2.0}}, rng())
+        self.assertNotEqual(salida.tobytes(), opaco.tobytes())
+
+    def test_exige_generador(self):
+        with self.assertRaises(SpecError):
+            finish.apply(lienzo(), AZUL, {"stain": 0.3})
+
+    def test_sin_mancha_no_exige_generador(self):
+        self.assertIsNotNone(finish.apply(lienzo(), AZUL, {"vignette": 0.3}))
+
+    def test_clave_desconocida(self):
+        with self.assertRaises(SpecError):
+            finish.apply(lienzo(), AZUL, {"stain": {"opacidad": 0.5}}, rng())
+
+    def test_tipo_invalido(self):
+        with self.assertRaises(SpecError):
+            finish.apply(lienzo(), AZUL, {"stain": "mucho"}, rng())
+
+
 class Validacion(unittest.TestCase):
     def test_clave_desconocida(self):
         with self.assertRaises(SpecError):
@@ -139,7 +191,8 @@ class Validacion(unittest.TestCase):
 
     def test_valores_fuera_de_rango(self):
         for spec in ({"vignette": 2}, {"grain": -1}, {"blur": 500},
-                     {"contrast": 20}, {"brightness": "alto"}, {"saturation": True}):
+                     {"contrast": 20}, {"brightness": "alto"}, {"saturation": True},
+                     {"stain": {"amount": 2}}):
             with self.assertRaises(SpecError, msg=spec):
                 finish.apply(lienzo(), AZUL, spec, rng())
 

@@ -157,6 +157,51 @@ class Fusion(unittest.TestCase):
             repeat.apply(marca(), {"step": [1, 0], "blend": "disolver"})
 
 
+class Caleidoscopio(unittest.TestCase):
+    def test_sectors_reemplaza_times(self):
+        # pivot en el borde derecho, 2 sectores: la copia orbita 180° y cae
+        # del otro lado del pivot, abriendo el lienzo hacia la derecha.
+        salida = repeat.apply(marca(100, 100), {"pivot": [0.5, 0], "sectors": 2})
+        self.assertEqual(salida.size, (200, 100))
+
+    def test_la_copia_orbita_y_gira_en_su_lugar(self):
+        salida = repeat.apply(marca(100, 100), {"pivot": [0.5, 0], "sectors": 2})
+        # La original no se mueve: su marca sigue arriba a la izquierda.
+        self.assertEqual(salida.getpixel((10, 10))[:3], (240, 240, 240))
+        # La copia orbitó al otro lado del pivot y además giró 180° sobre sí
+        # misma, así que su marca aparece abajo a la derecha del conjunto...
+        self.assertEqual(salida.getpixel((190, 90))[:3], (240, 240, 240))
+        # ...no arriba a la izquierda de su propia caja, que sería el caso si
+        # solo se hubiera trasladado sin girar.
+        self.assertNotEqual(salida.getpixel((110, 10))[:3], (240, 240, 240))
+
+    def test_pivot_en_el_centro_no_mueve_nada(self):
+        sin_pivot = repeat.apply(marca(), {"step": [0, 0], "times": 1, "rotate": 90})
+        con_pivot = repeat.apply(marca(), {"step": [0, 0], "times": 1, "rotate": 90, "pivot": [0, 0]})
+        self.assertEqual(sin_pivot.tobytes(), con_pivot.tobytes())
+
+    def test_sectors_no_necesita_step(self):
+        self.assertEqual(repeat.apply(marca(100, 100), {"sectors": 4}).size, (100, 100))
+
+    def test_sectors_y_times_excluyentes(self):
+        with self.assertRaises(SpecError):
+            repeat.apply(marca(), {"sectors": 4, "times": 2})
+
+    def test_sectors_y_rotate_excluyentes(self):
+        with self.assertRaises(SpecError):
+            repeat.apply(marca(), {"sectors": 4, "rotate": 10})
+
+    def test_sectors_invalido(self):
+        for malo in (1, 0, -3, 2.5, "seis", True):
+            with self.assertRaises(SpecError, msg=malo):
+                repeat.apply(marca(), {"sectors": malo})
+
+    def test_pivot_mal_formado(self):
+        for malo in ([1], [1, 2, 3], "1,0", [1, "x"], [True, 0], [100, 0]):
+            with self.assertRaises(SpecError, msg=malo):
+                repeat.apply(marca(), {"step": [0, 0], "pivot": malo})
+
+
 class Validacion(unittest.TestCase):
     def test_clave_desconocida(self):
         with self.assertRaises(SpecError):

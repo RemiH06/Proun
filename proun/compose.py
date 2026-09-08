@@ -54,6 +54,10 @@ def plan(spec: Spec, seed: int) -> Plan:
     candidatos = _filter_by_rate([layer for layer in spec.sources if not layer.cover], rng)
     resto = _pick(candidatos, spec.layers, rng)
     rng.shuffle(resto)
+    # `z` es opcional: sin declarar vale 0, así que una capa sin z queda en
+    # medio del revuelto de las demás sin-z (el sort es estable, respeta el
+    # orden que ya sorteó el shuffle) y solo se mueve si se la declara.
+    resto.sort(key=lambda layer: layer.z if layer.z is not None else 0.0)
 
     placements = [
         Placement(layer=layer, angle=angle, flip=flip, center=(0.5, 0.5), fill=1.0,

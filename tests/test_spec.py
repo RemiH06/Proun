@@ -457,6 +457,23 @@ class RateYOverlap(unittest.TestCase):
         self.assertEqual(config.sources[0].rate, 0.5)
 
 
+class Z(unittest.TestCase):
+    def test_por_defecto_es_none(self):
+        self.assertIsNone(spec.build(base(sources=[{"shape": "circle"}])).sources[0].z)
+
+    def test_acepta_negativos_y_positivos(self):
+        config = spec.build(base(sources=[
+            {"shape": "circle", "z": -2}, {"shape": "square", "z": 3.5},
+        ]))
+        self.assertEqual(config.sources[0].z, -2.0)
+        self.assertEqual(config.sources[1].z, 3.5)
+
+    def test_invalido(self):
+        for malo in ("arriba", True, False, [1]):
+            with self.assertRaises(SpecError, msg=malo):
+                spec.build(base(sources=[{"shape": "circle", "z": malo}]))
+
+
 class Defaults(unittest.TestCase):
     def test_se_aplican_a_todas(self):
         config = spec.build(base(defaults={"rotate": "random", "blend": "screen"},

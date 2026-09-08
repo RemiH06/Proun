@@ -1,10 +1,30 @@
 """Pruebas de proun.naming."""
 
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
-from proun import naming
+from PIL import Image
+
+from proun import naming, spec
 from proun.errors import SpecError
+
+RAIZ = Path(tempfile.mkdtemp(prefix="proun-naming-"))
+FUENTES = RAIZ / "fuentes"
+
+
+def setUpModule():
+    FUENTES.mkdir(parents=True)
+    Image.new("RGB", (200, 200), (200, 60, 60)).save(FUENTES / "a.png")
+
+
+def tearDownModule():
+    shutil.rmtree(RAIZ, ignore_errors=True)
+
+
+def config(**extra):
+    return spec.build({"sources": [str(FUENTES)], "colors": ["3ba7ff"], "seeds": [1], **extra})
 
 
 class Nombres(unittest.TestCase):
@@ -30,6 +50,15 @@ class Nombres(unittest.TestCase):
             naming.filename(-1, "ffffff", 5)
         with self.assertRaises(SpecError):
             naming.filename(1, "ffffff", -5)
+
+    def test_config_hash_se_agrega_al_final(self):
+        nombre = naming.filename(1, "ffffff", 5, config_hash="1a2b3c4d")
+        self.assertEqual(nombre, "wp_0001_ffffff_5_1a2b3c4d.png")
+
+    def test_config_hash_invalido(self):
+        for malo in ("no-hex", "1a2b3c4", "1A2B3C4D", "1a2b3c4d5"):
+            with self.assertRaises(SpecError, msg=malo):
+                naming.filename(1, "ffffff", 5, config_hash=malo)
 
 
 class Directorios(unittest.TestCase):
@@ -64,6 +93,14 @@ class Lectura(unittest.TestCase):
             with self.assertRaises(SpecError, msg=malo):
                 naming.parse(malo)
 
+    def test_con_hash_de_config(self):
+        nombre = naming.filename(7, "3ba7ff", 849213, config_hash="1a2b3c4d")
+        self.assertEqual(naming.parse(nombre),
+                         {"index": 7, "color": "3ba7ff", "seed": 849213, "hash": "1a2b3c4d"})
+
+    def test_sin_hash_no_agrega_la_clave(self):
+        self.assertNotIn("hash", naming.parse(naming.filename(7, "3ba7ff", 849213)))
+
 
 class Convencion(unittest.TestCase):
     def test_el_indice_identifica_la_composicion(self):
@@ -78,6 +115,47 @@ class Convencion(unittest.TestCase):
     def test_la_semilla_del_nombre_es_la_que_regenera(self):
         datos = naming.parse("wp_0009_112233_777888.png")
         self.assertEqual(datos["seed"], 777888)
+
+
+class ContentHash(unittest.TestCase):
+    def test_es_determinista(self):
+        self.assertEqual(naming.content_hash(config()), naming.content_hash(config()))
+
+    def test_es_hexadecimal_de_ocho(self):
+        self.assertRegex(naming.content_hash(config()), r"^[0-9a-f]{8}$")
+
+    def test_cambia_con_el_fondo(self):
+        self.assertNotEqual(naming.content_hash(config()),
+                            naming.content_hash(config(background="#ff0000")))
+
+    def test_cambia_con_el_layout(self):
+        self.assertNotEqual(naming.content_hash(config()),
+                            naming.content_hash(config(layout={"mode": "grid"})))
+
+    def test_cambia_con_defaults_de_recoloreado(self):
+        self.assertNotEqual(
+            naming.content_hash(config()),
+            naming.content_hash(config(defaults={"recolor": {"mode": "hue"}})),
+        )
+
+    def test_no_cambia_con_lo_que_ya_viaja_en_el_nombre(self):
+        # color, semilla, formato y numeración no necesitan hash propio: ya
+        # se distinguen solos en el nombre del archivo.
+        base = naming.content_hash(config())
+        self.assertEqual(base, naming.content_hash(config(colors=["ff0000"])))
+        self.assertEqual(base, naming.content_hash(config(seeds=[999])))
+        self.assertEqual(base, naming.content_hash(config(format="jpg")))
+        self.assertEqual(base, naming.content_hash(config(start_index=50)))
+        self.assertEqual(base, naming.content_hash(config(output="otro_directorio")))
+
+    def test_resolutions_no_cambia_el_hash_si_la_referencia_no_se_mueve(self):
+        # `resolutions` en sí no afecta el resultado de una resolución dada,
+        # pero por defecto también fija `reference` (la base del escalado):
+        # sin fijarla aparte, cambiar resolutions sí cambia el resultado.
+        base = naming.content_hash(config(reference="1920x1080"))
+        self.assertEqual(
+            base, naming.content_hash(config(resolutions=["800x600"], reference="1920x1080"))
+        )
 
 
 if __name__ == "__main__":

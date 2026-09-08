@@ -7,35 +7,20 @@ historial de commits, no aquí.
 
 ---
 
-## 8. Selección ponderada por proporción
+## Calendario para imprimir
 
-Cuando una capa toma su fuente de un pool (glob o lista), sortear con más
-probabilidad las imágenes cuya proporción calce mejor con el hueco de
-destino (el `crop.aspect` de la capa), en vez de un sorteo parejo entre
-todas. No puede ser "siempre la que mejor calza": eso mataría la variedad
-entre semillas del mismo lote. Tiene que ser una elección aleatoria
-ponderada, con `auto_rotate` (ya resuelto en `crop.py`) como una entrada
-más: cada candidata compite con su mejor orientación antes de pesarse, no
-solo la que trae de fábrica.
+Un procedimiento nuevo (script propio, al estilo de `diagnosticar.py` o
+`inspeccionar.py`, no una operación de capa) que arme un calendario en
+formato de impresión: doce imágenes, una por mes, tomadas de `fuentes/` o
+de wallpapers ya generados. Falta decidir el layout (una hoja por mes con
+grilla de días superpuesta, o una sola lámina con las doce), el tamaño de
+papel y márgenes de impresión, y si la grilla de fechas se dibuja con
+Pillow directo o se apoya en algo de `ops/text.py` para los números.
 
-## Caleidoscopio en repeat
+## Interfaz gráfica en React (v2.0)
 
-Las figuras (y las fotos) deberían poder repetirse en simetría radial: la
-misma pieza girando alrededor de un punto, no sobre su propio centro.
-`ops/repeat.py` ya hace giro acumulado por copia; falta que el giro sea
-alrededor de un `pivot` declarado y que se pueda pedir por `sectors` en vez
-de por `times`. Se puede resolver dentro del mismo módulo.
-
-## Sueltos
-
-- **`--overwrite` compara solo por nombre.** Como el nombre lleva índice,
-  color y semilla, un cambio en las fuentes o en cualquier parámetro que no
-  viaje en el nombre (modo de recoloreado, layout, fondo) deja el archivo
-  viejo como vigente y lo omite. Se resolvería con un hash de la
-  configuración en el nombre, a costa de que el nombre deje de ser legible.
-- **Orden explícito entre capas.** Hoy el orden lo decide la semilla y solo
-  se puede influir con `blend` y `opacity`. Un `z` por capa daría control,
-  pero hay que pensar cómo convive con el revuelto aleatorio.
-- **`stain` solo existe como operación de capa**, no como acabado del
-  lienzo entero (aunque `background.stain` ya cubre el caso de manchar el
-  fondo, que era el uso real que necesitábamos).
+No urgente: se hace después de terminar todo lo demás en este documento.
+Muchas decisiones siguen abiertas (FastAPI vs Flask, almacenamiento de
+`fuentes/`, estrategia de previsualización). El detalle de qué implica está
+en `CLAUDE.md`, sección "v2.0: interfaz gráfica en React"; esta entrada es
+solo el marcador de prioridad.

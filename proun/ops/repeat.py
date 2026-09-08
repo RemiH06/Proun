@@ -15,9 +15,9 @@ Formas aceptadas en `repeat`:
                                             propia secuencia desde la original
     {"steps": [{"step": [0.3, 0], "rotate": 90, "times": 3}]}
 
-Claves generales, que cada secuencia puede pisar: `times`, `mirror`, `rotate`
-y `fade`. `blend` es solo general, porque describe cómo se apila todo el
-conjunto.
+Claves generales, que cada secuencia puede pisar: `times`, `mirror`, `rotate`,
+`fade`, `pivot` y `sectors`. `blend` es solo general, porque describe cómo se
+apila todo el conjunto.
 
     times   copias además de la original
     mirror  true espeja las copias impares (es lo que da la simetría de
@@ -25,9 +25,26 @@ conjunto.
     rotate  giro acumulado: la copia 2 gira el doble que la 1
     fade    cada copia pierde esa fracción de opacidad
     blend   cómo se funden las copias entre sí, por ejemplo multiply
+
+Caleidoscopio: `pivot` y `sectors` arman una rueda de copias alrededor de un
+punto, en vez de una fila que avanza con `step`.
+
+    pivot     punto de giro, proporción de la propia imagen igual que `step`
+              ([0, 0] es el centro, que no mueve nada; [0.5, 0] es el borde
+              derecho). Sin `pivot`, `rotate` sigue girando cada copia sobre
+              su propio centro como siempre.
+    sectors   reemplaza a `times`: pide `sectors` copias repartidas en un
+              círculo completo (`360 / sectors` grados cada una) en vez de
+              decir cuántas y a qué ángulo a mano. No se combina con `times`
+              ni con `rotate` en el mismo paso, porque ya fija los dos.
+
+    {"pivot": [0.5, 0], "sectors": 6}    seis copias en abanico desde el
+                                         borde derecho de la imagen
 """
 
 from __future__ import annotations
+
+import math
 
 from PIL import Image
 
@@ -35,8 +52,8 @@ from ..errors import SpecError
 from .blend import MODES, composite
 from .rotate import apply as turn
 
-KEYS = {"step", "steps", "times", "mirror", "rotate", "fade", "blend"}
-STEP_KEYS = {"step", "times", "mirror", "rotate", "fade"}
+KEYS = {"step", "steps", "times", "mirror", "rotate", "fade", "blend", "pivot", "sectors"}
+STEP_KEYS = {"step", "times", "mirror", "rotate", "fade", "pivot", "sectors"}
 MIRRORS = ("none", "alternate", "all")
 
 MAX_COPIES = 200
@@ -55,6 +72,8 @@ def apply(im: Image.Image, spec, canvas=None) -> Image.Image:
         raise SpecError("repeat admite step o steps, no los dos")
 
     raw = spec.get("steps", [spec["step"]] if "step" in spec else None)
+    if raw is None and "sectors" in spec:
+        raw = [{}]  # sectors por sí solo alcanza: no hace falta un step explícito
     if raw is None:
         raise SpecError("repeat necesita step o steps")
     if _is_pair(raw):
@@ -84,14 +103,35 @@ def _sequence(im: Image.Image, entrada, general) -> list:
     unknown = set(entrada) - STEP_KEYS
     if unknown:
         raise SpecError(f"claves desconocidas en un paso de repeat: {sorted(unknown)}")
-    if "step" not in entrada:
-        raise SpecError(f"a este paso de repeat le falta 'step': {entrada!r}")
 
-    dx, dy = _step(entrada["step"])
-    times = _times(entrada.get("times", general.get("times", 1)))
+    # `sectors` puede venir del propio paso o, en la forma corta sin `steps`,
+    # del nivel general (que ahí es el spec entero). El choque con times/rotate
+    # se revisa en el mismo dict de donde salió sectors, no en el otro.
+    origen = entrada if "sectors" in entrada else general
+    sectors = origen.get("sectors")
+    if sectors is not None:
+        if "times" in origen:
+            raise SpecError("repeat no admite sectors y times juntos en el mismo paso")
+        if "rotate" in origen:
+            raise SpecError("repeat.sectors ya fija el ángulo de giro, no lo combines con rotate")
+        times = _sectors(sectors) - 1
+        angle = 360.0 / (times + 1)
+    else:
+        times = _times(entrada.get("times", general.get("times", 1)))
+        angle = _angle(entrada.get("rotate", general.get("rotate", 0)))
+
+    if "step" not in entrada and sectors is None:
+        raise SpecError(f"a este paso de repeat le falta 'step': {entrada!r}")
+    dx, dy = _step(entrada["step"]) if "step" in entrada else (0.0, 0.0)
+
     mirror = _mirror(entrada.get("mirror", general.get("mirror", False)))
-    angle = _angle(entrada.get("rotate", general.get("rotate", 0)))
     fade = _fade(entrada.get("fade", general.get("fade", 0.0)))
+
+    pivot_raw = entrada.get("pivot", general.get("pivot"))
+    pivot = None
+    if pivot_raw is not None:
+        px, py = _pivot(pivot_raw)
+        pivot = (px * im.width, py * im.height)
 
     # El espejo se aplica sobre los ejes en los que hay avance: así la copia
     # se refleja contra su vecina y las dos se leen como una sola figura.
@@ -107,9 +147,25 @@ def _sequence(im: Image.Image, entrada, general) -> list:
         if angle:
             pieza = turn(pieza, angle * i)
         opacidad = max(0.0, 1.0 - fade * i)
-        if opacidad > 0:
-            salida.append((pieza, (dx * i * im.width, dy * i * im.height), opacidad))
+        if opacidad <= 0:
+            continue
+        centro = (dx * i * im.width, dy * i * im.height)
+        if pivot is not None:
+            # La copia orbita `pivot` en vez de solo correrse en línea recta:
+            # se resta el propio pivot ya girado, así la original (que no se
+            # mueve) queda fija y las demás abren en abanico a su alrededor.
+            giro = _rotar(pivot, angle * i)
+            centro = (centro[0] + pivot[0] - giro[0], centro[1] + pivot[1] - giro[1])
+        salida.append((pieza, centro, opacidad))
     return salida
+
+
+def _rotar(punto: tuple[float, float], angulo_grados: float) -> tuple[float, float]:
+    """Gira `punto`, medido desde el origen, `angulo_grados` alrededor de él."""
+    rad = math.radians(angulo_grados)
+    x, y = punto
+    coseno, seno = math.cos(rad), math.sin(rad)
+    return (x * coseno - y * seno, x * seno + y * coseno)
 
 
 def _assemble(piezas, blend_mode: str) -> Image.Image:
@@ -174,6 +230,23 @@ def _times(value) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= MAX_COPIES:
         raise SpecError(f"repeat.times debe ser un entero entre 0 y {MAX_COPIES}, llegó {value!r}")
     return value
+
+
+def _sectors(value) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 2 <= value <= MAX_COPIES + 1:
+        raise SpecError(
+            f"repeat.sectors debe ser un entero entre 2 y {MAX_COPIES + 1}, llegó {value!r}"
+        )
+    return value
+
+
+def _pivot(value) -> tuple[float, float]:
+    if not _is_pair(value):
+        raise SpecError(f"repeat.pivot debe ser [x, y] con dos números, llegó {value!r}")
+    for v in value:
+        if abs(v) > 20:
+            raise SpecError(f"repeat.pivot es proporción de la imagen, {v} es absurdo")
+    return (float(value[0]), float(value[1]))
 
 
 def _mirror(value) -> str:

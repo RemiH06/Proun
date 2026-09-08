@@ -20,7 +20,7 @@ LAYER_KEYS = {
     "src", "crop", "resize", "mosaic", "rotate", "stain", "tones", "transparent",
     "recolor", "color",
     "opacity", "blend", "position", "anchor", "region", "bleed", "copies",
-    "repeat", "cover", "shape", "outline", "rate", "overlap", "text",
+    "repeat", "cover", "shape", "outline", "rate", "overlap", "text", "z",
     "pool", "pool_bias", "pool_dark_bias",
 }
 
@@ -63,6 +63,7 @@ class Layer:
     cover: bool = False
     rate: float = 1.0
     overlap: object = None
+    z: float | None = None
 
 
 @dataclass(frozen=True)
@@ -346,6 +347,18 @@ def _overlap(value):
     return float(value)
 
 
+def _z(value):
+    """Orden de apilado. Sin declarar, la capa queda en 0: en medio del
+    revuelto aleatorio, no en un extremo fijo, así que declarar `z` en unas
+    pocas capas alcanza para subirlas o bajarlas sin tener que etiquetar
+    todas las demás."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise SpecError(f"z debe ser un número, llegó {value!r}")
+    return float(value)
+
+
 def _sources(value, defaults: dict) -> tuple[Layer, ...]:
     if not value:
         raise SpecError("hace falta al menos una imagen en sources")
@@ -397,6 +410,7 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
             raise SpecError(f"opacity debe estar entre 0 y 1, llegó {opacity!r}")
         rate = _rate(merged.pop("rate", 1.0))
         overlap = _overlap(merged.pop("overlap", None))
+        z = _z(merged.pop("z", None))
 
         comun = dict(
             crop=merged.get("crop"),
@@ -416,6 +430,7 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
             cover=cover,
             rate=rate,
             overlap=overlap,
+            z=z,
         )
 
         if "shape" in entry:

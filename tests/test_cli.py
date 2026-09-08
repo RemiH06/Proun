@@ -113,6 +113,18 @@ class Existentes(unittest.TestCase):
         correr(*args, "--overwrite", salida=destino)
         self.assertNotEqual(archivo.read_bytes(), b"basura")
 
+    def test_un_cambio_de_layout_no_queda_tapado_por_el_nombre_viejo(self):
+        # Antes del hash de config, mismo índice/color/semilla con distinto
+        # layout compartían nombre: sin --overwrite, el archivo viejo (de la
+        # config anterior) quedaba como si fuera el vigente. Ahora el nombre
+        # cambia solo, así que aparece un archivo nuevo en vez de omitirse.
+        args = ("--resolutions", "160x100", "--colors", "00ff00", "--seed", "5")
+        _, destino = correr(*args)
+        antes = set(generados(destino))
+        correr(*args, "--layout", "grid", salida=destino)
+        despues = set(generados(destino))
+        self.assertTrue(antes < despues)
+
 
 class DryRun(unittest.TestCase):
     def test_no_escribe_nada(self):

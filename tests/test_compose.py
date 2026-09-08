@@ -69,6 +69,31 @@ class Planificacion(unittest.TestCase):
         self.assertEqual(len(colocacion.center), 2)
         self.assertGreater(colocacion.fill, 0)
 
+    def test_z_alto_queda_arriba_del_todo(self):
+        # "arriba" es "al final de placements": render pinta en ese orden.
+        sources = [str(FUENTES / "a.png"), str(FUENTES / "b.png"),
+                   {"src": str(FUENTES / "c.png"), "z": 10}]
+        for s in range(12):
+            placements = compose.plan(config(sources=sources), s).placements
+            self.assertEqual(placements[-1].layer.src.name, "c.png", s)
+
+    def test_z_bajo_queda_abajo_del_todo(self):
+        sources = [{"src": str(FUENTES / "a.png"), "z": -10},
+                   str(FUENTES / "b.png"), str(FUENTES / "c.png")]
+        for s in range(12):
+            placements = compose.plan(config(sources=sources), s).placements
+            self.assertEqual(placements[0].layer.src.name, "a.png", s)
+
+    def test_sin_z_el_orden_sigue_revuelto(self):
+        # z por defecto no debe fijar el orden de nadie: cubre el caso de no
+        # romper la reproducibilidad de especificaciones ya existentes.
+        sources = [str(FUENTES / "a.png"), str(FUENTES / "b.png"), str(FUENTES / "c.png")]
+        ordenes = {
+            tuple(p.layer.src.name for p in compose.plan(config(sources=sources), s).placements)
+            for s in range(12)
+        }
+        self.assertGreater(len(ordenes), 1)
+
 
 class Render(unittest.TestCase):
     def test_tamano_del_lienzo(self):
