@@ -294,6 +294,31 @@ cubrir ni ocultar contenido**.
   entre `goto()` y que el script empiece a correr varía de corrida a
   corrida.
 
+## Marca (logo)
+
+Homenaje geométrico directo a "Beat the Whites with the Red Wedge" de El
+Lissitzky (sin texto ni las marcas propias del cartel, solo su geometría),
+afinado junto con el usuario en varias rondas (arrancó como plano+cuña,
+pasó por dos triángulos, después círculo+cuña con campo diagonal, hasta
+llegar a esta versión, simétrica, a partir de un boceto que el propio
+usuario dibujó): fondo de tinta (`#141210`) con dos esquinas de papel
+opuestas (arriba-izquierda y abajo-derecha), un círculo de papel centrado,
+y un triángulo rojo (`#d94f3d`) grande e irregular (escaleno) centrado
+adentro del círculo y recortado con `<clipPath>` a la forma del círculo,
+así sus esquinas quedan ocultas en vez de asomar por fuera. Un solo SVG
+(`viewBox 0 0 64 64`, pensado para leerse bien hasta en 16px de favicon),
+copiado igual en dos rutas porque son raíces de despliegue distintas:
+- `frontend/public/favicon.svg` (favicon del GUI, y también referenciado
+  desde el masthead de `App.tsx` junto al wordmark).
+- `docs/images/logo.svg` (favicon de `docs/index.html` y su footer).
+
+El wordmark gigante del hero de `docs/index.html` se queda sin el símbolo
+a propósito: es un momento tipográfico deliberado, sumarle el ícono ahí
+lo recargaría. Si hace falta regenerar o ajustar la geometría, las
+coordenadas de los dos polígonos ya están centradas por bounding box
+dentro del viewBox; no son arbitrarias, se calcularon rotando cada forma
+alrededor de su propio centro y recentrando el conjunto.
+
 ## Convenciones adicionales
 
 - Sin `#000`/`#fff` puros en CSS.

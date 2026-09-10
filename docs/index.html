@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Proun: generador de wallpapers tipo collage</title>
 <meta name="description" content="Proun genera wallpapers de collage con paleta normalizada, inspirado en el fotomontaje constructivista de El Lissitzky. Sin dependencias más allá de Pillow.">
+<link rel="icon" type="image/svg+xml" href="images/logo.svg">
 
 <style>
   @font-face {
@@ -549,6 +550,14 @@
 
   .footer-row a { color: var(--ink); }
 
+  .footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .footer-brand img { width: 20px; height: 20px; display: block; }
+
   .footer-note {
     margin: 24px 0 0;
     max-width: 40em;
@@ -731,7 +740,7 @@
 <footer>
   <div class="wrap">
     <div class="footer-row">
-      <span>Proun</span>
+      <span class="footer-brand"><img src="images/logo.svg" alt=""> Proun</span>
       <a href="https://github.com/RemiH06/Proun">github.com/RemiH06/Proun</a>
       <span>Licencia MIT</span>
     </div>

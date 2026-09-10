@@ -79,6 +79,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="masthead">
+        <img src="/favicon.svg" alt="" className="masthead-mark" />
         <h1>Proun</h1>
         <p className="muted">generador de wallpapers tipo collage</p>
       </header>

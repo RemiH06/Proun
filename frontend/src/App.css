@@ -19,6 +19,13 @@
   color: var(--red);
 }
 
+.masthead-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+}
+
 .layout {
   flex: 1;
   min-height: 0;
