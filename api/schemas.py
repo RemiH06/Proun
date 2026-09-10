@@ -24,6 +24,7 @@ class ImageLayer(BaseModel):
     color: str | None = None
     repeat: dict | None = None
     mosaic: dict | None = None
+    position: list[float] | None = None
 
 
 class PreviewRequest(BaseModel):

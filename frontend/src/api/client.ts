@@ -15,15 +15,24 @@ export type RepeatConfig =
   // más = deja hueco); es lo que multiplica a la dirección para dar el
   // `step` real que espera el motor.
   | { kind: 'linear'; dirX: -1 | 0 | 1; dirY: -1 | 0 | 1; spacing: number; times: number; mirror: boolean }
-  | { kind: 'kaleidoscope'; pivotX: number; pivotY: number; sectors: number }
+  // pivotDirX/pivotDirY: de qué lado queda el pivote (mismo compás que el
+  // lineal, sin el centro). spacing acá es qué tan lejos del centro de la
+  // imagen queda ese pivote: más lejos, el abanico de copias se abre más.
+  | { kind: 'kaleidoscope'; pivotDirX: number; pivotDirY: number; spacing: number; sectors: number }
 
 export type MosaicConfig = null | { cols: number; rows: number; mirror: boolean }
+
+// Fracción [0,1] del lienzo; null = el layout la ubica solo, como siempre.
+export type PositionConfig = null | { x: number; y: number }
 
 // Una imagen elegida a mano, con sus propios ajustes de capa. Los valores
 // "por defecto" (0°, sin voltear, opacidad 1, blend normal, sin color
 // propio, sin repeat, sin mosaico) no viajan al backend: toLayerDict() solo
-// manda las claves que de verdad cambian algo.
+// manda las claves que de verdad cambian algo. `id` identifica esta capa en
+// particular, no la imagen: la misma foto puede entrar dos veces al
+// collage como dos capas independientes, cada una con su propio `id`.
 export type ImageConfig = {
+  id: string
   path: string
   name: string
   angle: 0 | 90 | 180 | 270
@@ -34,10 +43,12 @@ export type ImageConfig = {
   color: string | null
   repeat: RepeatConfig
   mosaic: MosaicConfig
+  position: PositionConfig
 }
 
 export function newImageConfig(path: string, name: string): ImageConfig {
   return {
+    id: crypto.randomUUID(),
     path,
     name,
     angle: 0,
@@ -48,6 +59,7 @@ export function newImageConfig(path: string, name: string): ImageConfig {
     color: null,
     repeat: null,
     mosaic: null,
+    position: null,
   }
 }
 
@@ -74,10 +86,16 @@ export function toLayerDict(cfg: ImageConfig): Record<string, unknown> {
             times: cfg.repeat.times,
             mirror: cfg.repeat.mirror,
           }
-        : { pivot: [cfg.repeat.pivotX, cfg.repeat.pivotY], sectors: cfg.repeat.sectors }
+        : {
+            pivot: [cfg.repeat.pivotDirX * cfg.repeat.spacing, cfg.repeat.pivotDirY * cfg.repeat.spacing],
+            sectors: cfg.repeat.sectors,
+          }
   }
   if (cfg.mosaic) {
     layer.mosaic = { grid: [cfg.mosaic.cols, cfg.mosaic.rows], mirror: cfg.mosaic.mirror }
+  }
+  if (cfg.position) {
+    layer.position = [cfg.position.x, cfg.position.y]
   }
   return layer
 }

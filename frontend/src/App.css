@@ -215,6 +215,28 @@
   font-family: var(--display);
 }
 
+.position-pad {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  border: 2px solid var(--ink);
+  background: var(--paper-dim);
+  position: relative;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.position-pad-marker {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--red);
+  border: 1px solid var(--paper);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 .image-panel {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -246,6 +268,7 @@
   white-space: nowrap;
 }
 
+.duplicate,
 .remove {
   flex: 0 0 auto;
   border: none;
@@ -256,6 +279,7 @@
   padding: 0 0.3rem;
 }
 
+.duplicate:hover,
 .remove:hover {
   background: var(--red);
   color: var(--paper);

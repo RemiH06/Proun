@@ -123,6 +123,17 @@ class Preview(unittest.TestCase):
         self.assertEqual(b.status_code, 200)
         self.assertNotEqual(a.content, b.content)
 
+    def test_una_posicion_explicita_ubica_la_capa_ahi(self):
+        # Dos posiciones bien separadas tienen que dar composiciones
+        # distintas; si position no llegara al motor, darían lo mismo.
+        arriba_izq = cuerpo(images=imagenes({"position": [0.1, 0.1]}))
+        abajo_der = cuerpo(images=imagenes({"position": [0.9, 0.9]}))
+        a = client.post("/api/preview", json=arriba_izq)
+        b = client.post("/api/preview", json=abajo_der)
+        self.assertEqual(a.status_code, 200)
+        self.assertEqual(b.status_code, 200)
+        self.assertNotEqual(a.content, b.content)
+
     def test_caleidoscopio_no_revienta_y_cambia_el_resultado(self):
         sin_repeat = cuerpo(images=imagenes({}))
         con_caleidoscopio = cuerpo(

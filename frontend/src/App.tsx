@@ -10,7 +10,7 @@ import { useDebouncedValue } from './hooks/useDebouncedValue'
 import { useSpecState } from './hooks/useSpecState'
 
 export default function App() {
-  const { state, update, reroll, toggleImage, updateImage, removeImage } = useSpecState()
+  const { state, update, reroll, toggleImage, updateImage, removeImage, duplicateImage } = useSpecState()
   const [folderPath, setFolderPath] = useState('')
   const [options, setOptions] = useState<Options | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -82,6 +82,7 @@ export default function App() {
           options={options}
           onUpdate={updateImage}
           onRemove={removeImage}
+          onDuplicate={duplicateImage}
         />
         <div className="column">
           <PreviewPane imageUrl={imageUrl} loading={loading} error={error} />

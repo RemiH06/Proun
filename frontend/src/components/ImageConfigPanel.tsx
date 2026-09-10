@@ -1,5 +1,6 @@
 import type { ImageConfig, Options } from '../api/client'
 import { thumbnailUrl } from '../api/client'
+import { PositionPad } from './PositionPad'
 import { Stepper } from './Stepper'
 
 type Props = {
@@ -7,6 +8,7 @@ type Props = {
   options: Options | null
   onUpdate: (patch: Partial<ImageConfig>) => void
   onRemove: () => void
+  onDuplicate: () => void
 }
 
 const ANGLES = [0, 90, 180, 270] as const
@@ -26,12 +28,14 @@ const DIRECCIONES: Array<{ label: string; dx: Direccion; dy: Direccion }> = [
   { label: '↘', dx: 1, dy: 1 },
 ]
 
-const PIVOTES: Array<{ label: string; x: number; y: number }> = [
-  { label: '← borde', x: -0.5, y: 0 },
-  { label: '↑ borde', x: 0, y: -0.5 },
-  { label: '→ borde', x: 0.5, y: 0 },
-  { label: '↓ borde', x: 0, y: 0.5 },
-  { label: 'esquina', x: 0.5, y: 0.5 },
+// Mismo compás que DIRECCIONES, sin el centro (el pivote siempre queda
+// afuera de la imagen); spacing (slider aparte) escala esta dirección.
+const PIVOTES: Array<{ label: string; dx: number; dy: number }> = [
+  { label: '←', dx: -1, dy: 0 },
+  { label: '↑', dx: 0, dy: -1 },
+  { label: '→', dx: 1, dy: 0 },
+  { label: '↓', dx: 0, dy: 1 },
+  { label: '↘ esquina', dx: 1, dy: 1 },
 ]
 
 const GRIDS: Array<[number, number]> = [
@@ -43,7 +47,7 @@ const GRIDS: Array<[number, number]> = [
   [1, 4],
 ]
 
-export function ImageConfigPanel({ config: c, options, onUpdate, onRemove }: Props) {
+export function ImageConfigPanel({ config: c, options, onUpdate, onRemove, onDuplicate }: Props) {
   const blendModes = options?.blend_modes ?? [c.blend]
 
   return (
@@ -53,9 +57,17 @@ export function ImageConfigPanel({ config: c, options, onUpdate, onRemove }: Pro
         <span className="image-panel-name" title={c.name}>
           {c.name}
         </span>
+        <button type="button" className="duplicate" onClick={onDuplicate} title="agregar otra vez">
+          +
+        </button>
         <button type="button" className="remove" onClick={onRemove} title="quitar">
           ×
         </button>
+      </div>
+
+      <div className="control-group">
+        <span className="control-label">Posición</span>
+        <PositionPad value={c.position} onChange={(position) => onUpdate({ position })} />
       </div>
 
       <div className="control-group">
@@ -167,7 +179,9 @@ export function ImageConfigPanel({ config: c, options, onUpdate, onRemove }: Pro
             type="button"
             className={c.repeat?.kind === 'kaleidoscope' ? 'active' : ''}
             onClick={() =>
-              onUpdate({ repeat: { kind: 'kaleidoscope', pivotX: 0.5, pivotY: 0, sectors: 6 } })
+              onUpdate({
+                repeat: { kind: 'kaleidoscope', pivotDirX: 1, pivotDirY: 0, spacing: 0.5, sectors: 6 },
+              })
             }
           >
             caleidoscopio
@@ -233,24 +247,38 @@ export function ImageConfigPanel({ config: c, options, onUpdate, onRemove }: Pro
         {c.repeat?.kind === 'kaleidoscope' && (
           <div className="sub-controls">
             <div className="button-row wrap">
-              {PIVOTES.map(({ label, x, y }) => (
+              {PIVOTES.map(({ label, dx, dy }) => (
                 <button
                   key={label}
                   type="button"
                   className={
-                    c.repeat?.kind === 'kaleidoscope' && c.repeat.pivotX === x && c.repeat.pivotY === y
+                    c.repeat?.kind === 'kaleidoscope' &&
+                    c.repeat.pivotDirX === dx &&
+                    c.repeat.pivotDirY === dy
                       ? 'active'
                       : ''
                   }
                   onClick={() =>
                     c.repeat?.kind === 'kaleidoscope' &&
-                    onUpdate({ repeat: { ...c.repeat, pivotX: x, pivotY: y } })
+                    onUpdate({ repeat: { ...c.repeat, pivotDirX: dx, pivotDirY: dy } })
                   }
                 >
                   {label}
                 </button>
               ))}
             </div>
+            <span className="control-label">espaciado (qué tan lejos se abre)</span>
+            <input
+              type="range"
+              min={0.1}
+              max={1.5}
+              step={0.05}
+              value={c.repeat.spacing}
+              onChange={(e) =>
+                c.repeat?.kind === 'kaleidoscope' &&
+                onUpdate({ repeat: { ...c.repeat, spacing: Number(e.target.value) } })
+              }
+            />
             <div className="row">
               <span className="control-label">sectores</span>
               <Stepper
