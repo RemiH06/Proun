@@ -169,6 +169,68 @@ class Render(unittest.TestCase):
         self.assertEqual(salida.getpixel((395, 295))[:3], (0, 0, 0))
 
 
+class AcabadoPorCapa(unittest.TestCase):
+    """`finish` ya no es solo del wallpaper entero (`spec.finish`): una capa
+    también puede declarar el suyo (`Layer.finish`), aplicado sobre su propio
+    tile antes de pegarlo al lienzo. Ver el comentario en
+    `compose.render` sobre por qué hay que restaurar el alfa después."""
+
+    def test_cambia_el_resultado(self):
+        sin_acabado = config(sources=[{"src": str(FUENTES / "b.png")}], layers=1)
+        con_acabado = config(
+            sources=[{"src": str(FUENTES / "b.png"), "finish": {"vignette": 0.9}}], layers=1,
+        )
+        plan_a, plan_b = compose.plan(sin_acabado, 1), compose.plan(con_acabado, 1)
+        a = compose.render(sin_acabado, plan_a, (400, 300), AZUL)
+        b = compose.render(con_acabado, plan_b, (400, 300), AZUL)
+        self.assertNotEqual(a.tobytes(), b.tobytes())
+
+    def test_no_mancha_el_borde_transparente_de_la_capa(self):
+        # Una figura chica sobre lienzo transparente, bien lejos de las
+        # esquinas: si el acabado no respetara el alfa original de la capa,
+        # una viñeta fuerte pintaría de negro opaco todo su recuadro, no solo
+        # la figura, y las esquinas del lienzo dejarían de estar vacías.
+        base = spec.build({
+            "sources": [{"shape": "circle", "position": [0.5, 0.5],
+                         "resize": {"size": [60, 60]}, "finish": {"vignette": 1.0}}],
+            "resolutions": ["400x300"], "colors": [AZUL], "seeds": [1],
+            "background": None,
+        })
+        salida = compose.render(base, compose.plan(base, 1), (400, 300), AZUL)
+        self.assertEqual(salida.getpixel((2, 2))[3], 0)
+        self.assertEqual(salida.getpixel((397, 2))[3], 0)
+
+    def test_es_determinista(self):
+        base = config(
+            sources=[{"src": str(FUENTES / "b.png"),
+                     "finish": {"grain": 0.3, "vignette": 0.2}}],
+            layers=1,
+        )
+        plan = compose.plan(base, 5)
+        uno = compose.render(base, plan, (400, 300), AZUL)
+        dos = compose.render(base, plan, (400, 300), AZUL)
+        self.assertEqual(uno.tobytes(), dos.tobytes())
+
+    def test_convive_con_el_acabado_global(self):
+        solo_global = config(
+            sources=[{"src": str(FUENTES / "b.png")}], layers=1, finish={"grain": 0.3},
+        )
+        ambos = config(
+            sources=[{"src": str(FUENTES / "b.png"), "finish": {"vignette": 0.5}}],
+            layers=1, finish={"grain": 0.3},
+        )
+        plan_a, plan_b = compose.plan(solo_global, 9), compose.plan(ambos, 9)
+        a = compose.render(solo_global, plan_a, (400, 300), AZUL)
+        b = compose.render(ambos, plan_b, (400, 300), AZUL)
+        self.assertNotEqual(a.tobytes(), b.tobytes())
+
+    def test_clave_desconocida_avisa_en_espanol(self):
+        base = config(sources=[{"src": str(FUENTES / "b.png"), "finish": {"blur": "mucho"}}],
+                     layers=1)
+        with self.assertRaises(SpecError):
+            compose.render(base, compose.plan(base, 1), (400, 300), AZUL)
+
+
 class Escalado(unittest.TestCase):
     def test_factor_por_area(self):
         base = config(reference="800x450")

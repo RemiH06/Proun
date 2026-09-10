@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { LayerConfig, Options, ShapeKind } from '../api/client'
 import { thumbnailUrl } from '../api/client'
+import { FinishControls } from './FinishControls'
 import { PositionPad } from './PositionPad'
 import { Stepper } from './Stepper'
 
@@ -91,12 +93,21 @@ function encabezado(c: LayerConfig) {
 }
 
 export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDuplicate }: Props) {
+  const [colapsado, setColapsado] = useState(false)
   const blendModes = options?.blend_modes ?? [c.blend]
   const shapeKinds = (options?.shape_kinds ?? ['rect', 'circle', 'triangle', 'diamond', 'polygon']) as ShapeKind[]
 
   return (
     <section className="panel image-panel">
       <div className="image-panel-header">
+        <button
+          type="button"
+          className="collapse-toggle"
+          onClick={() => setColapsado(!colapsado)}
+          title={colapsado ? 'expandir' : 'compactar'}
+        >
+          {colapsado ? '▸' : '▾'}
+        </button>
         {encabezado(c)}
         <button type="button" className="duplicate" onClick={onDuplicate} title="agregar otra vez">
           +
@@ -106,6 +117,8 @@ export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDup
         </button>
       </div>
 
+      {!colapsado && (
+      <>
       {c.kind === 'text' && (
         <div className="control-group">
           <span className="control-label">Texto</span>
@@ -331,6 +344,8 @@ export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDup
         />
       </div>
 
+      <FinishControls finish={c.finish} onUpdate={(patch) => onUpdate({ finish: { ...c.finish, ...patch } })} />
+
       <div className="control-group">
         <span className="control-label">Repetición</span>
         <div className="button-row">
@@ -506,6 +521,8 @@ export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDup
           </div>
         )}
       </div>
+      </>
+      )}
     </section>
   )
 }

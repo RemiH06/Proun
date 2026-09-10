@@ -296,6 +296,7 @@
   clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
 }
 
+.collapse-toggle,
 .duplicate,
 .remove {
   flex: 0 0 auto;
@@ -305,6 +306,11 @@
   font-size: 1.2rem;
   line-height: 1;
   padding: 0 0.3rem;
+}
+
+.collapse-toggle {
+  color: var(--ink);
+  font-size: 0.75rem;
 }
 
 .duplicate:hover,

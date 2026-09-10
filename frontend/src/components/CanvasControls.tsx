@@ -1,11 +1,20 @@
+import { RESOLUTIONS } from '../api/client'
 import type { BackgroundConfig, BackgroundDirection, BackgroundMode, FinishConfig } from '../api/client'
+import { FinishControls } from './FinishControls'
 
 type Props = {
+  resolution: string
   background: BackgroundConfig
   finish: FinishConfig
+  onResolutionChange: (resolution: string) => void
   onUpdateBackground: (patch: Partial<BackgroundConfig>) => void
   onUpdateFinish: (patch: Partial<FinishConfig>) => void
 }
+
+const GRUPOS: Array<{ label: string; group: 'escritorio' | 'celular' }> = [
+  { label: 'escritorio', group: 'escritorio' },
+  { label: 'celular', group: 'celular' },
+]
 
 const MODOS: Array<{ label: string; value: BackgroundMode }> = [
   { label: 'auto', value: 'auto' },
@@ -20,10 +29,32 @@ const DIRECCIONES: Array<{ label: string; value: BackgroundDirection }> = [
   { label: 'radial', value: 'radial' },
 ]
 
-export function CanvasControls({ background, finish, onUpdateBackground, onUpdateFinish }: Props) {
+export function CanvasControls({
+  resolution,
+  background,
+  finish,
+  onResolutionChange,
+  onUpdateBackground,
+  onUpdateFinish,
+}: Props) {
   return (
     <section className="panel">
       <h2>Fondo y acabado</h2>
+
+      <div className="control-group">
+        <span className="control-label">Dimensiones del canvas</span>
+        <select value={resolution} onChange={(e) => onResolutionChange(e.target.value)}>
+          {GRUPOS.map(({ label, group }) => (
+            <optgroup key={group} label={label}>
+              {RESOLUTIONS.filter((r) => r.group === group).map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
 
       <div className="control-group">
         <span className="control-label">Fondo</span>
@@ -85,110 +116,7 @@ export function CanvasControls({ background, finish, onUpdateBackground, onUpdat
         />
       </div>
 
-      <div className="control-group">
-        <span className="control-label">Viñeta</span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={finish.vignette}
-          onChange={(e) => onUpdateFinish({ vignette: Number(e.target.value) })}
-        />
-      </div>
-
-      <div className="control-group">
-        <span className="control-label">Grano</span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={finish.grain}
-          onChange={(e) => onUpdateFinish({ grain: Number(e.target.value) })}
-        />
-      </div>
-
-      <div className="control-group">
-        <span className="control-label">Desenfoque</span>
-        <input
-          type="range"
-          min={0}
-          max={20}
-          step={0.5}
-          value={finish.blur}
-          onChange={(e) => onUpdateFinish({ blur: Number(e.target.value) })}
-        />
-      </div>
-
-      <div className="control-group">
-        <span className="control-label">Contraste</span>
-        <input
-          type="range"
-          min={0.5}
-          max={2}
-          step={0.05}
-          value={finish.contrast}
-          onChange={(e) => onUpdateFinish({ contrast: Number(e.target.value) })}
-        />
-      </div>
-
-      <div className="control-group">
-        <span className="control-label">Brillo</span>
-        <input
-          type="range"
-          min={0.5}
-          max={2}
-          step={0.05}
-          value={finish.brightness}
-          onChange={(e) => onUpdateFinish({ brightness: Number(e.target.value) })}
-        />
-      </div>
-
-      <div className="control-group">
-        <span className="control-label">Saturación</span>
-        <input
-          type="range"
-          min={0.5}
-          max={2}
-          step={0.05}
-          value={finish.saturation}
-          onChange={(e) => onUpdateFinish({ saturation: Number(e.target.value) })}
-        />
-      </div>
-
-      <div className="control-group">
-        <span className="control-label">Veladura</span>
-        <div className="button-row">
-          <button
-            type="button"
-            className={finish.overlay.on ? 'active' : ''}
-            onClick={() => onUpdateFinish({ overlay: { ...finish.overlay, on: !finish.overlay.on } })}
-          >
-            {finish.overlay.on ? 'activa' : 'apagada'}
-          </button>
-        </div>
-        {finish.overlay.on && (
-          <div className="sub-controls">
-            <input
-              type="color"
-              value={finish.overlay.color}
-              onChange={(e) => onUpdateFinish({ overlay: { ...finish.overlay, color: e.target.value } })}
-            />
-            <span className="control-label">opacidad</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={finish.overlay.opacity}
-              onChange={(e) =>
-                onUpdateFinish({ overlay: { ...finish.overlay, opacity: Number(e.target.value) } })
-              }
-            />
-          </div>
-        )}
-      </div>
+      <FinishControls finish={finish} onUpdate={onUpdateFinish} />
 
       <div className="control-group">
         <span className="control-label">Manchas del acabado</span>

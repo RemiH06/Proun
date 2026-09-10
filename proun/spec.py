@@ -21,7 +21,7 @@ LAYER_KEYS = {
     "recolor", "color",
     "opacity", "blend", "position", "anchor", "region", "bleed", "copies",
     "repeat", "cover", "shape", "outline", "rate", "overlap", "text", "z",
-    "pool", "pool_bias", "pool_dark_bias",
+    "pool", "pool_bias", "pool_dark_bias", "finish",
 }
 
 SPEC_KEYS = {
@@ -50,6 +50,7 @@ class Layer:
     repeat: object = None
     rotate: object = None
     stain: object = None
+    finish: dict = field(default_factory=dict)
     tones: object = True
     transparent: object = None
     recolor: dict = field(default_factory=dict)
@@ -419,6 +420,7 @@ def _sources(value, defaults: dict) -> tuple[Layer, ...]:
             repeat=merged.get("repeat"),
             rotate=merged.get("rotate"),
             stain=merged.get("stain"),
+            finish=merged.get("finish") or {},
             recolor=dict(recolor),
             color=merged.get("color"),
             opacity=float(opacity),

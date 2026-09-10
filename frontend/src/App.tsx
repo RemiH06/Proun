@@ -93,8 +93,10 @@ export default function App() {
           <AddLayerButtons onAddShape={addShape} onAddText={addText} />
           <ParamControls state={state} options={options} onUpdate={update} onReroll={reroll} />
           <CanvasControls
+            resolution={state.resolution}
             background={state.background}
             finish={state.finish}
+            onResolutionChange={(resolution) => update('resolution', resolution)}
             onUpdateBackground={updateBackground}
             onUpdateFinish={updateFinish}
           />

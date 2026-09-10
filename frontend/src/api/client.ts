@@ -53,6 +53,10 @@ type CommonLayer = {
   cropAspect: string | null
   // 0 = sin manchar.
   stainAmount: number
+  // Mismo acabado que el global (viñeta, grano, desenfoque...), pero
+  // aplicado solo a esta capa antes de pegarla al lienzo. `stainAmount` de
+  // acá adentro no se manda (esta capa ya tiene su propio `stain` arriba).
+  finish: FinishConfig
 }
 
 // `id` identifica esta capa en particular, no el archivo/figura/texto: la
@@ -89,6 +93,7 @@ function commonDefaults(): CommonLayer {
     z: 0,
     cropAspect: null,
     stainAmount: 0,
+    finish: defaultFinish(),
   }
 }
 
@@ -153,6 +158,8 @@ export function toLayerDict(cfg: LayerConfig): Record<string, unknown> {
   if (cfg.z !== 0) layer.z = cfg.z
   if (cfg.cropAspect) layer.crop = { aspect: cfg.cropAspect }
   if (cfg.stainAmount > 0) layer.stain = { amount: cfg.stainAmount }
+  const finishDict = toFinishDict(cfg.finish)
+  if (finishDict) layer.finish = finishDict
 
   return layer
 }
@@ -230,6 +237,23 @@ function toFinishDict(f: FinishConfig): Record<string, unknown> | undefined {
   return Object.keys(out).length > 0 ? out : undefined
 }
 
+// Dimensiones del canvas. La vista previa usa el mismo aspecto, solo que
+// achicado (ver api/routes_render.py::_resolucion_de_vista_previa), así que
+// elegir un tamaño de celular ya se ve vertical desde la vista previa.
+export type ResolutionGroup = 'escritorio' | 'celular'
+
+export const RESOLUTIONS: Array<{ label: string; value: string; group: ResolutionGroup }> = [
+  { label: '1280x720 (HD)', value: '1280x720', group: 'escritorio' },
+  { label: '1920x1080 (Full HD)', value: '1920x1080', group: 'escritorio' },
+  { label: '2560x1440 (2K)', value: '2560x1440', group: 'escritorio' },
+  { label: '3840x2160 (4K)', value: '3840x2160', group: 'escritorio' },
+  { label: '1080x1920 (celular)', value: '1080x1920', group: 'celular' },
+  { label: '1170x2532 (iPhone)', value: '1170x2532', group: 'celular' },
+  { label: '1290x2796 (iPhone Pro Max)', value: '1290x2796', group: 'celular' },
+]
+
+export const DEFAULT_RESOLUTION = '1920x1080'
+
 export type PreviewParams = {
   layers: LayerConfig[]
   layoutMode: string
@@ -238,9 +262,10 @@ export type PreviewParams = {
   seed: number
   background: BackgroundConfig
   finish: FinishConfig
+  resolution: string
 }
 
-export type ExportParams = PreviewParams & { resolution: string }
+export type ExportParams = PreviewParams
 
 export const SEED_MIN = 100_000
 export const SEED_MAX = 999_999_999
@@ -267,6 +292,7 @@ function toBody(p: PreviewParams) {
     seed: p.seed,
     background: toBackgroundDict(p.background),
     finish: toFinishDict(p.finish),
+    resolution: p.resolution,
   }
 }
 
@@ -302,7 +328,7 @@ export async function exportImage(
   const res = await fetch('/api/export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...toBody(params), resolution: params.resolution }),
+    body: JSON.stringify(toBody(params)),
   })
   if (!res.ok) throw new Error(await readError(res))
   const blob = await res.blob()

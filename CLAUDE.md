@@ -83,7 +83,7 @@ proun/
   ops/                 una operación por archivo, aplicadas en este orden
                         exacto sobre cada capa:
     crop → resize → mosaic → repeat → stain → rotate → tones →
-    transparency → recolor
+    transparency → recolor → finish (opcional, por capa)
                         __init__.py debe quedar VACÍO (imports ahí generan
                         falsos circulares en Windows)
 
@@ -113,6 +113,19 @@ docs/                       sitio de documentación (ver sección aparte)
   `plan()` es puramente determinista dada la semilla; regenerar el mismo
   wallpaper es correr con la misma semilla, sin importar cuánto tiempo
   pasó.
+- **`finish` es tanto global (`Spec.finish`) como por capa (`Layer.finish`)**:
+  la misma función `ops/finish.py::apply` sirve para las dos cosas, pero
+  está pensada para un lienzo opaco. Aplicada tal cual sobre el tile de una
+  capa (que suele tener bordes transparentes: el recuadro alrededor de una
+  figura, o de una foto girada) pintaría esos bordes de negro/ruido opaco,
+  porque viñeta/grano/veladura no miran el alfa de lo que reciben. Por eso
+  `compose.render` guarda el alfa original de la capa antes de llamar a
+  `finish.apply` y lo restaura después (ver el comentario ahí): así el
+  acabado queda adentro de la silueta de la capa, no en todo su recuadro.
+  Si algún día se agrega un nuevo sub-efecto a `ops/finish.py`, hay que
+  revisar si también ensucia el alfa fuera del contenido real antes de
+  darlo por seguro para uso por capa (probalo como
+  `tests/test_compose.py::AcabadoPorCapa` lo hace con vignette/grain).
 
 ## v2.0: interfaz gráfica en React
 
@@ -146,20 +159,37 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   entra con su propio submenú de ajustes (`LayerConfigPanel`, columna del
   medio, scrolleable): rotar/voltear, opacidad, modo de fusión, color
   propio, recorte por proporción (`crop.aspect`, botones libre/1:1/4:3/
-  3:4/16:9/9:16), manchas propias (`stain`), repetición lineal (con
-  espaciado) o caleidoscopio (`pivot`/`sectors`, con espaciado), mosaico,
-  posición manual (arrastrar en un cuadrito que representa el lienzo) y
-  orden de apilado (`z`, atrás/adelante); las capas de figura suman tipo
-  (`shape`, botones) y contorno, las de texto suman el input de texto
-  (el único texto libre del editor, fuera de la ruta de carpeta) y
-  peso/alineación. Todo con botones/sliders. Un botón "duplicar" por capa
-  permite que la misma imagen/figura/texto entre dos veces al collage
-  como dos capas independientes (identificadas por `id`, no por ruta).
+  3:4/16:9/9:16), manchas propias (`stain`), acabado propio (`finish`:
+  viñeta, grano, desenfoque, contraste, brillo, saturación, veladura,
+  mismos controles que el acabado global, componente compartido
+  `FinishControls`), repetición lineal (con espaciado) o caleidoscopio
+  (`pivot`/`sectors`, con espaciado), mosaico, posición manual (arrastrar
+  en un cuadrito que representa el lienzo) y orden de apilado (`z`, atrás/
+  adelante); las capas de figura suman tipo (`shape`, botones) y contorno,
+  las de texto suman el input de texto (el único texto libre del editor,
+  fuera de la ruta de carpeta) y peso/alineación. Todo con botones/
+  sliders. Un botón "duplicar" por capa permite que la misma imagen/
+  figura/texto entre dos veces al collage como dos capas independientes
+  (identificadas por `id`, no por ruta). Cada submenú es compactable
+  (flechita ▾/▸ en el encabezado, estado local del componente, no viaja al
+  spec) para que una lista larga de capas no vuelva la columna del medio
+  inmanejable.
 - Parámetros globales que quedan en `ParamControls`: `layout.mode`, color
   principal del lote, `recolor.mode`, semilla con "rehacer". Los ajustes
   globales de `background` (auto/sólido/degradado + dirección + manchas)
   y `finish` (viñeta, grano, desenfoque, contraste, brillo, saturación,
   veladura, manchas) viven en `CanvasControls`, debajo de esos.
+- **Dimensiones del canvas**: también en `CanvasControls`, arriba de todo.
+  Un único `resolution` (`RESOLUTIONS` en `client.ts`, agrupado en
+  `optgroup` "escritorio"/"celular") maneja tanto la vista previa como el
+  export: la vista previa reusa ese mismo aspecto, solo que achicada al
+  lado mayor `api/routes_render.py::PREVIEW_LADO_MAYOR` (480px), así que
+  elegir un tamaño de celular (vertical) ya se ve vertical en la vista
+  previa, no solo al exportar. Si algún día la vista previa vuelve a verse
+  con el aspecto viejo después de tocar `api/`, el sospechoso número uno es
+  un `uvicorn` sin `--reload` corriendo con el módulo cacheado de antes del
+  cambio, no un bug real: confirmá con `curl` directo al backend antes de
+  asumir que el código está mal.
 - El mosaico tiene una compensación en `api/routes_render.py`
   (`_sin_explosion_de_mosaico`): el motor salta el resize automático al
   hueco del layout cuando hay `mosaic` sin `resize` propio, así que sin

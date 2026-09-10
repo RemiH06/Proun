@@ -25,6 +25,7 @@ class LayerSpec(BaseModel):
     text: str | dict | None = None
     crop: dict | None = None
     stain: dict | None = None
+    finish: dict | None = None
     rotate: dict | None = None
     opacity: float | None = None
     blend: str | None = None
@@ -43,10 +44,14 @@ class PreviewRequest(BaseModel):
     seed: int = 100_000
     background: dict | str | None = None
     finish: dict | None = None
+    # Dimensiones del canvas (mismo aspecto que va a exportarse). La vista
+    # previa reusa este valor, solo que achicado, para que el encuadre real
+    # se vea desde el primer momento: ver
+    # `routes_render._resolucion_de_vista_previa`.
+    resolution: str = "1920x1080"
 
 
 class ExportRequest(PreviewRequest):
-    resolution: str = "1920x1080"
     format: str = "png"
     output: str = "wallpapers"
 

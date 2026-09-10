@@ -188,6 +188,15 @@ class Preview(unittest.TestCase):
         self.assertEqual(b.status_code, 200)
         self.assertNotEqual(a.content, b.content)
 
+    def test_finish_por_capa_cambia_el_resultado(self):
+        sin_acabado = cuerpo(layers=capas({}))
+        con_vineta = cuerpo(layers=capas({"finish": {"vignette": 0.9}}))
+        a = client.post("/api/preview", json=sin_acabado)
+        b = client.post("/api/preview", json=con_vineta)
+        self.assertEqual(a.status_code, 200)
+        self.assertEqual(b.status_code, 200)
+        self.assertNotEqual(a.content, b.content)
+
     def test_una_figura_sola_no_revienta(self):
         resp = client.post("/api/preview", json=cuerpo(layers=[{"shape": "circle"}]))
         self.assertEqual(resp.status_code, 200)
@@ -213,6 +222,14 @@ class Preview(unittest.TestCase):
         self.assertEqual(a.status_code, 200)
         self.assertEqual(b.status_code, 200)
         self.assertNotEqual(a.content, b.content)
+
+    def test_la_vista_previa_respeta_el_aspecto_del_canvas(self):
+        vertical = cuerpo(resolution="1080x1920")
+        resp = client.post("/api/preview", json=vertical)
+        self.assertEqual(resp.status_code, 200)
+        imagen = Image.open(io.BytesIO(resp.content))
+        self.assertGreater(imagen.height, imagen.width)
+        self.assertLessEqual(max(imagen.size), 480)
 
     def test_finish_explicito_cambia_el_resultado(self):
         sin_acabado = cuerpo()

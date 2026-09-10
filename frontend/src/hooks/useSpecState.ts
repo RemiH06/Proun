@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  DEFAULT_RESOLUTION,
   defaultBackground,
   defaultFinish,
   newImageLayer,
@@ -20,6 +21,7 @@ export type SpecState = {
   seed: number
   background: BackgroundConfig
   finish: FinishConfig
+  resolution: string
 }
 
 export function useSpecState() {
@@ -31,6 +33,7 @@ export function useSpecState() {
     seed: randomSeed(),
     background: defaultBackground(),
     finish: defaultFinish(),
+    resolution: DEFAULT_RESOLUTION,
   })
 
   function update<K extends keyof SpecState>(key: K, value: SpecState[K]) {

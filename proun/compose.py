@@ -250,13 +250,25 @@ def render(spec: Spec, current: Plan, resolution: tuple[int, int], main,
     canvas = background.build(resolution, main, spec.background,
                               random.Random(current.seed ^ 0x5EED))
 
-    for placement, base in zip(current.placements, shaped):
+    for indice, (placement, base) in enumerate(zip(current.placements, shaped)):
         layer = placement.layer
         try:
             tile = recolor.apply(base.tonal, placement.color or main, layer.recolor,
                                  base.source)
         except Exception as exc:
             raise SourceError(f"falló el recoloreado de {layer.src.name}: {exc}") from exc
+        if layer.finish:
+            # `finish.apply` está pensado para un lienzo opaco (el wallpaper
+            # entero): viñeta, grano y veladura pintan sin mirar el alfa de
+            # lo que reciben, así que aplicado tal cual sobre una capa con
+            # bordes transparentes (el recuadro alrededor de una figura o una
+            # foto girada) dejaría un halo opaco ahí. Se restaura el alfa
+            # original después para que el acabado quede adentro de la
+            # silueta de la capa, no en todo su recuadro.
+            alfa = tile.getchannel("A")
+            tile = finish.apply(tile, placement.color or main, layer.finish,
+                                random.Random(current.seed * 1_000_003 + indice + 700_001))
+            tile.putalpha(alfa)
         if layer.cover:
             position = (0, 0)
         elif base.position is not None:

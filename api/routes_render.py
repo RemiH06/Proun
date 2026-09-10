@@ -19,10 +19,19 @@ from .schemas import ExportRequest, PreviewRequest
 
 router = APIRouter()
 
-PREVIEW_RESOLUTION = "480x270"
+PREVIEW_LADO_MAYOR = 480
 
 _MEDIA_TYPES = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
                 "webp": "image/webp"}
+
+
+def _resolucion_de_vista_previa(resolution: str) -> str:
+    """Vista previa chica, pero con el mismo aspecto que se va a exportar:
+    si no, elegir un tamaño de celular (vertical) se seguiría viendo
+    horizontal en la vista previa hasta exportar de verdad."""
+    ancho, alto = spec_module.parse_resolutions([resolution])[0]
+    factor = PREVIEW_LADO_MAYOR / max(ancho, alto)
+    return f"{max(1, round(ancho * factor))}x{max(1, round(alto * factor))}"
 
 
 def _sin_explosion_de_mosaico(capa: dict, lado_mayor: int) -> dict:
@@ -78,7 +87,7 @@ def _render(body: PreviewRequest, resolution: str, fmt: str = "png", output: str
 
 @router.post("/preview")
 def preview(body: PreviewRequest) -> Response:
-    _, image = _render(body, PREVIEW_RESOLUTION)
+    _, image = _render(body, _resolucion_de_vista_previa(body.resolution))
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return Response(content=buffer.getvalue(), media_type="image/png")
