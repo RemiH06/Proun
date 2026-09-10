@@ -51,6 +51,11 @@ type CommonLayer = {
   z: number
   // null = sin recortar. Si no, algo como "1:1" o "16:9".
   cropAspect: string | null
+  // null = tamaño automático del layout (como hasta ahora). Si no, fracción
+  // del lienzo (0-1.5) que ocupa el lado mayor de la capa: mismo mecanismo
+  // que ya usa el layout para su propio sorteo de tamaño, solo que fijado a
+  // mano en vez de aleatorio.
+  resizeScale: number | null
   // 0 = sin manchar.
   stainAmount: number
   // Mismo acabado que el global (viñeta, grano, desenfoque...), pero
@@ -92,6 +97,7 @@ function commonDefaults(): CommonLayer {
     position: null,
     z: 0,
     cropAspect: null,
+    resizeScale: null,
     stainAmount: 0,
     finish: defaultFinish(),
   }
@@ -157,6 +163,9 @@ export function toLayerDict(cfg: LayerConfig): Record<string, unknown> {
   }
   if (cfg.z !== 0) layer.z = cfg.z
   if (cfg.cropAspect) layer.crop = { aspect: cfg.cropAspect }
+  if (cfg.resizeScale !== null) {
+    layer.resize = { size: [cfg.resizeScale, cfg.resizeScale], mode: 'fit' }
+  }
   if (cfg.stainAmount > 0) layer.stain = { amount: cfg.stainAmount }
   const finishDict = toFinishDict(cfg.finish)
   if (finishDict) layer.finish = finishDict

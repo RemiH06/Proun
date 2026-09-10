@@ -219,6 +219,27 @@ export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDup
       </div>
 
       <div className="control-group">
+        <span className="control-label">Tamaño</span>
+        <div className="button-row">
+          <button
+            type="button"
+            className={c.resizeScale === null ? 'active' : ''}
+            onClick={() => onUpdate({ resizeScale: null })}
+          >
+            auto
+          </button>
+        </div>
+        <input
+          type="range"
+          min={0.05}
+          max={1.5}
+          step={0.05}
+          value={c.resizeScale ?? 0.4}
+          onChange={(e) => onUpdate({ resizeScale: Number(e.target.value) })}
+        />
+      </div>
+
+      <div className="control-group">
         <span className="control-label">Capas (atrás / adelante)</span>
         <Stepper value={c.z} min={-10} max={10} onChange={(z) => onUpdate({ z })} />
       </div>

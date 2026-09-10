@@ -158,8 +158,11 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   saca); figuras y texto se agregan con `AddLayerButtons`. Cada capa
   entra con su propio submenú de ajustes (`LayerConfigPanel`, columna del
   medio, scrolleable): rotar/voltear, opacidad, modo de fusión, color
-  propio, recorte por proporción (`crop.aspect`, botones libre/1:1/4:3/
-  3:4/16:9/9:16), manchas propias (`stain`), acabado propio (`finish`:
+  propio, tamaño manual (`resize.size` como fracción del lienzo, botón
+  "auto" vuelve al tamaño que sortea el layout, mismo mecanismo que ya usa
+  `layout.sizes()` internamente), recorte por proporción (`crop.aspect`,
+  botones libre/1:1/4:3/3:4/16:9/9:16), manchas propias (`stain`), acabado
+  propio (`finish`:
   viñeta, grano, desenfoque, contraste, brillo, saturación, veladura,
   mismos controles que el acabado global, componente compartido
   `FinishControls`), repetición lineal (con espaciado) o caleidoscopio
@@ -185,11 +188,21 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   export: la vista previa reusa ese mismo aspecto, solo que achicada al
   lado mayor `api/routes_render.py::PREVIEW_LADO_MAYOR` (480px), así que
   elegir un tamaño de celular (vertical) ya se ve vertical en la vista
-  previa, no solo al exportar. Si algún día la vista previa vuelve a verse
-  con el aspecto viejo después de tocar `api/`, el sospechoso número uno es
-  un `uvicorn` sin `--reload` corriendo con el módulo cacheado de antes del
-  cambio, no un bug real: confirmá con `curl` directo al backend antes de
-  asumir que el código está mal.
+  previa, no solo al exportar.
+- **Gotcha de `uvicorn --reload` en sesiones largas**: el watcher (WatchFiles)
+  puede dejar de recargar después del primer reload y quedarse serviendo
+  código viejo el resto de la sesión, sin avisar (no tira error, el proceso
+  sigue vivo y respondiendo 200). Encima Pydantic ignora en silencio
+  cualquier clave que el modelo viejo no conozca, así que un campo nuevo en
+  `api/schemas.py` (como pasó con `resize` en un layer) se manda desde el
+  frontend, el servidor responde 200, y el resultado sale igual que sin ese
+  campo, sin ningún error visible. Si un cambio de comportamiento en `api/`
+  o `proun/` no se nota al probar contra el `uvicorn` que ya estaba
+  corriendo, no asumas que el código está mal: primero confirmá el cambio
+  con una llamada directa a `compose`/`spec` en Python (sin HTTP), y si eso
+  sí funciona, matá el proceso entero (`taskkill //PID <reloader> //F //T`,
+  el PID del *reloader*, no del worker) y arrancá `uvicorn` de nuevo antes
+  de seguir depurando.
 - El mosaico tiene una compensación en `api/routes_render.py`
   (`_sin_explosion_de_mosaico`): el motor salta el resize automático al
   hueco del layout cuando hay `mosaic` sin `resize` propio, así que sin

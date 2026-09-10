@@ -179,6 +179,15 @@ class Preview(unittest.TestCase):
         self.assertEqual(b.status_code, 200)
         self.assertNotEqual(a.content, b.content)
 
+    def test_resize_por_capa_cambia_el_resultado(self):
+        chica = cuerpo(layers=capas({"resize": {"size": [0.1, 0.1]}}))
+        grande = cuerpo(layers=capas({"resize": {"size": [0.8, 0.8]}}))
+        a = client.post("/api/preview", json=chica)
+        b = client.post("/api/preview", json=grande)
+        self.assertEqual(a.status_code, 200)
+        self.assertEqual(b.status_code, 200)
+        self.assertNotEqual(a.content, b.content)
+
     def test_stain_por_capa_cambia_el_resultado(self):
         sin_mancha = cuerpo(layers=capas({}))
         manchada = cuerpo(layers=capas({"stain": {"amount": 0.9}}))
@@ -302,12 +311,11 @@ class Mosaico(unittest.TestCase):
         self.assertIsNone(built.sources[0].resize)
 
     def test_respeta_un_resize_propio(self):
-        # Prueba directa del helper con dicts planos: LayerSpec (el schema
-        # que expone la API) todavía no tiene un campo "resize" propio, así
-        # que esta rama solo se puede ejercitar así por ahora.
-        capa = {"src": str(GRANDE), "mosaic": {"grid": [3, 3]}, "resize": {"max_side": 111}}
-        resultado = _sin_explosion_de_mosaico(capa, 800)
-        self.assertEqual(resultado["resize"], {"max_side": 111})
+        body = PreviewRequest(layers=[LayerSpec(
+            src=str(GRANDE), mosaic={"grid": [3, 3]}, resize={"max_side": 111},
+        )])
+        built = _build_spec(body, "800x600")
+        self.assertEqual(built.sources[0].resize, {"max_side": 111})
 
     def test_no_toca_capas_sin_grid_explicito(self):
         capa = {"src": str(GRANDE), "mosaic": {"size": [400, 400]}}

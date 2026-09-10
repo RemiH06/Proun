@@ -24,6 +24,7 @@ class LayerSpec(BaseModel):
     outline: dict | None = None
     text: str | dict | None = None
     crop: dict | None = None
+    resize: dict | None = None
     stain: dict | None = None
     finish: dict | None = None
     rotate: dict | None = None
