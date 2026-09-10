@@ -37,6 +37,48 @@ class Generacion(unittest.TestCase):
                 text.build(malo)
 
 
+class RasterOverflow(unittest.TestCase):
+    def test_marzo_2027_no_revienta(self):
+        # Reproducido con Big Shoulders Bold a 800px: FreeType tira "raster
+        # overflow" con esta combinación de letras y no con "enero 2027" al
+        # mismo tamaño. No depende de la especificación, es un bug real del
+        # rasterizador a tamaños de fuente grandes; ver `text._rasterize`.
+        im = text.build({"text": "marzo 2027", "weight": "bold"})
+        self.assertEqual(im.mode, "RGBA")
+        self.assertGreater(im.getchannel("A").getextrema()[1], 0)
+
+    def test_reintenta_con_una_fuente_mas_chica_si_freetype_revienta(self):
+        original = text._draw
+        tamanos = []
+
+        def falla_la_primera_vez(font, *args, **kwargs):
+            tamanos.append(font.size)
+            if len(tamanos) == 1:
+                raise OSError("raster overflow")
+            return original(font, *args, **kwargs)
+
+        text._draw = falla_la_primera_vez
+        try:
+            im = text.build("PROUN")
+        finally:
+            text._draw = original
+        self.assertEqual(im.mode, "RGBA")
+        self.assertEqual(len(tamanos), 2)
+        self.assertGreater(tamanos[0], tamanos[1])
+
+    def test_si_ni_el_tamano_minimo_alcanza_se_propaga(self):
+        def siempre_revienta(*args, **kwargs):
+            raise OSError("raster overflow")
+
+        original = text._draw
+        text._draw = siempre_revienta
+        try:
+            with self.assertRaises(OSError):
+                text.build("PROUN")
+        finally:
+            text._draw = original
+
+
 class Peso(unittest.TestCase):
     def test_bold_es_el_default(self):
         self.assertEqual(text.build("PROUN").tobytes(),

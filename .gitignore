@@ -6,6 +6,7 @@ venv/
 
 # salida generada
 wallpapers/
+calendario*.pdf
 
 # imágenes de origen
 fuentes/

@@ -1,0 +1,14 @@
+{
+  "_nota": "Filtros para 'python calendario.py --filters json/filtros.json'. Se les aplica a las doce fotos antes de armar cada página, todas con el mismo 'color' para que compartan paleta. Mismas claves que documentan proun/ops/tones.py, proun/ops/recolor.py y proun/ops/finish.py (este último es opcional: agregar 'finish': {'vignette': 0.2, 'grain': 0.03} suma viñeta y grano). recolor.mode admite duotone (este), tint, screen, hue, channels o none. Una clave que empieza con '_' es un comentario y se ignora.",
+
+  "color": "#3ba7ff",
+
+  "tones": {
+    "normalize": true
+  },
+
+  "recolor": {
+    "mode": "duotone",
+    "strength": 1.0
+  }
+}

@@ -62,16 +62,57 @@ def build(spec) -> Image.Image:
         raise SpecError("text necesita una cadena no vacía")
 
     texto = str(spec["text"])
-    font = _font(spec)
+    ruta = _font_path(spec)
     align = str(spec.get("align", "left")).lower()
     if align not in ALIGNS:
         raise SpecError(f"text.align debe ser uno de {ALIGNS}, llegó {align!r}")
     espaciado = _positive(spec.get("line_spacing", 1.15), "text.line_spacing")
-    ancho_stroke = _stroke_width(spec.get("outline"))
+    stroke_fraction = _stroke_fraction(spec.get("outline"))
 
-    lado = WORKING_SIZE * SUPERSAMPLE
+    tamano_normal = WORKING_SIZE * SUPERSAMPLE
+    font = _load_font(ruta, tamano_normal)
+    lado = tamano_normal
     lineas = _wrap(texto, font, spec.get("wrap"), lado) if "wrap" in spec else [texto]
 
+    im = _rasterize(ruta, lineas, align, espaciado, stroke_fraction, tamano_normal)
+
+    pequeno = im.resize((max(1, im.width // SUPERSAMPLE), max(1, im.height // SUPERSAMPLE)),
+                        Image.Resampling.LANCZOS)
+    alfa = pequeno.point(lambda v: 255 if v > 0 else 0)
+    return Image.merge("RGBA", (pequeno, pequeno, pequeno, alfa))
+
+
+def _rasterize(ruta, lineas, align, espaciado, stroke_fraction, tamano) -> Image.Image:
+    """Dibuja `lineas` al tamaño de trabajo normal y, si FreeType revienta con
+    "raster overflow", reintenta con una fuente más chica y agranda el
+    resultado al tamaño que hubiera tenido.
+
+    Es un bug real del rasterizador con ciertas formas de glifo a tamaños de
+    fuente grandes (reproducido con "marzo 2027" en Big Shoulders Bold a
+    800px, no con "enero 2027" al mismo tamaño), no algo que dependa de la
+    especificación: no hay forma de saber de antemano qué combinación de
+    letras lo va a disparar, así que hay que poder recuperarse en caliente.
+    """
+    intento = tamano
+    while True:
+        font = _load_font(ruta, intento)
+        try:
+            im = _draw(font, lineas, align, espaciado, round(stroke_fraction * intento))
+        except OSError:
+            intento //= 2
+            if intento < 50:
+                raise
+            continue
+        if intento != tamano:
+            factor = tamano / intento
+            im = im.resize(
+                (max(1, round(im.width * factor)), max(1, round(im.height * factor))),
+                Image.Resampling.LANCZOS,
+            )
+        return im
+
+
+def _draw(font, lineas, align, espaciado, ancho_stroke) -> Image.Image:
     alto_linea = round((font.getbbox("Ay")[3] - font.getbbox("Ay")[1]) * espaciado)
     cajas = [font.getbbox(linea, stroke_width=ancho_stroke) for linea in lineas]
     ancho_total = max((c[2] - c[0] for c in cajas), default=1)
@@ -93,25 +134,24 @@ def build(spec) -> Image.Image:
                       stroke_width=ancho_stroke, stroke_fill=CONTORNO)
         else:
             draw.text((x, y), linea, font=font, fill=FILL)
-
-    pequeno = im.resize((max(1, im.width // SUPERSAMPLE), max(1, im.height // SUPERSAMPLE)),
-                        Image.Resampling.LANCZOS)
-    alfa = pequeno.point(lambda v: 255 if v > 0 else 0)
-    return Image.merge("RGBA", (pequeno, pequeno, pequeno, alfa))
+    return im
 
 
-def _font(spec) -> "ImageFont.FreeTypeFont":
+def _font_path(spec) -> Path:
     if "font" in spec:
         ruta = Path(str(spec["font"])).expanduser()
         if not ruta.is_file():
             raise SpecError(f"no existe la fuente: {spec['font']}")
-    else:
-        weight = str(spec.get("weight", "bold")).lower()
-        if weight not in DEFAULT_FONTS:
-            raise SpecError(f"text.weight debe ser uno de {sorted(DEFAULT_FONTS)}, llegó {weight!r}")
-        ruta = DEFAULT_FONTS[weight]
+        return ruta
+    weight = str(spec.get("weight", "bold")).lower()
+    if weight not in DEFAULT_FONTS:
+        raise SpecError(f"text.weight debe ser uno de {sorted(DEFAULT_FONTS)}, llegó {weight!r}")
+    return DEFAULT_FONTS[weight]
+
+
+def _load_font(ruta: Path, tamano: int) -> "ImageFont.FreeTypeFont":
     try:
-        return ImageFont.truetype(str(ruta), WORKING_SIZE * SUPERSAMPLE)
+        return ImageFont.truetype(str(ruta), tamano)
     except OSError as exc:
         raise SpecError(f"no se pudo abrir la fuente {ruta}: {exc}") from exc
 
@@ -138,9 +178,9 @@ def _wrap(texto: str, font, wrap, ancho_lienzo: int) -> list[str]:
     return lineas
 
 
-def _stroke_width(outline) -> int:
+def _stroke_fraction(outline) -> float:
     if not outline:
-        return 0
+        return 0.0
     if not isinstance(outline, dict):
         raise SpecError(f"outline debe ser un objeto, llegó {outline!r}")
     unknown = set(outline) - {"width"}
@@ -149,7 +189,7 @@ def _stroke_width(outline) -> int:
     width = outline.get("width", 0.03)
     if isinstance(width, bool) or not isinstance(width, (int, float)) or not 0 <= width <= 0.3:
         raise SpecError(f"outline.width debe estar entre 0 y 0.3, llegó {width!r}")
-    return round(width * WORKING_SIZE * SUPERSAMPLE)
+    return float(width)
 
 
 def _positive(value, name) -> float:
