@@ -9,9 +9,15 @@ historial de commits, no aquí.
 
 ## Interfaz gráfica en React (v2.0)
 
-En construcción, ya no es solo un marcador de prioridad. Lo que existe hoy
-(`api/`, `frontend/`) y lo que falta está documentado en `CLAUDE.md`,
-sección "v2.0: interfaz gráfica en React".
+En construcción. Ya funciona: elegir imágenes a mano (selección múltiple
+por clic), submenú de ajustes por imagen (rotar/voltear, opacidad, fusión,
+color propio, repeat lineal y caleidoscopio con espaciado, mosaico,
+posición arrastrable, orden de capas, duplicar), parámetros globales
+(layout, color, recoloreado, semilla) y exportar. Lo que falta está
+documentado en `CLAUDE.md`, sección "v2.0: interfaz gráfica en React":
+subida real de imágenes (hoy sigue siendo una carpeta local), y el resto
+del editor visual (`crop`, `stain`, figuras, texto, `background`/`finish`
+globales).
 
 ## Logo de Proun
 

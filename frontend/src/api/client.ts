@@ -44,6 +44,9 @@ export type ImageConfig = {
   repeat: RepeatConfig
   mosaic: MosaicConfig
   position: PositionConfig
+  // Orden de apilado: 0 = donde caiga por sorteo (igual que no declararlo).
+  // Más alto pinta más arriba (adelante), más bajo pinta más abajo (atrás).
+  z: number
 }
 
 export function newImageConfig(path: string, name: string): ImageConfig {
@@ -60,6 +63,7 @@ export function newImageConfig(path: string, name: string): ImageConfig {
     repeat: null,
     mosaic: null,
     position: null,
+    z: 0,
   }
 }
 
@@ -97,6 +101,7 @@ export function toLayerDict(cfg: ImageConfig): Record<string, unknown> {
   if (cfg.position) {
     layer.position = [cfg.position.x, cfg.position.y]
   }
+  if (cfg.z !== 0) layer.z = cfg.z
   return layer
 }
 

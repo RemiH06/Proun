@@ -134,6 +134,30 @@ class Preview(unittest.TestCase):
         self.assertEqual(b.status_code, 200)
         self.assertNotEqual(a.content, b.content)
 
+    def test_z_alto_pinta_encima(self):
+        # Dos capas centradas en el mismo punto exacto, cada una con su
+        # propio color: la de z más alto tiene que quedar arriba (se ve su
+        # color en el centro), sin importar en qué orden se sortearon.
+        centro = {"position": [0.5, 0.5]}
+        arriba_azul = cuerpo(images=imagenes(
+            {**centro, "z": -5, "color": "#ff0000"},
+            {**centro, "z": 5, "color": "#2244ff"},
+        ))
+        resp = client.post("/api/preview", json=arriba_azul)
+        self.assertEqual(resp.status_code, 200)
+        imagen = Image.open(io.BytesIO(resp.content))
+        r, g, b = imagen.getpixel((imagen.width // 2, imagen.height // 2))[:3]
+        self.assertGreater(b, r)
+
+        arriba_roja = cuerpo(images=imagenes(
+            {**centro, "z": 5, "color": "#ff0000"},
+            {**centro, "z": -5, "color": "#2244ff"},
+        ))
+        resp2 = client.post("/api/preview", json=arriba_roja)
+        imagen2 = Image.open(io.BytesIO(resp2.content))
+        r2, g2, b2 = imagen2.getpixel((imagen2.width // 2, imagen2.height // 2))[:3]
+        self.assertGreater(r2, b2)
+
     def test_caleidoscopio_no_revienta_y_cambia_el_resultado(self):
         sin_repeat = cuerpo(images=imagenes({}))
         con_caleidoscopio = cuerpo(

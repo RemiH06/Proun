@@ -25,6 +25,7 @@ class ImageLayer(BaseModel):
     repeat: dict | None = None
     mosaic: dict | None = None
     position: list[float] | None = None
+    z: float | None = None
 
 
 class PreviewRequest(BaseModel):

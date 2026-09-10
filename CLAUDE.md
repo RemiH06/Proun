@@ -137,17 +137,33 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   `docs/index.html` (`frontend/src/styles/tokens.css`), siguiendo el
   criterio de la skill `site-launch-checklist` instalada en
   `.claude/skills/`.
-- Alcance del MVP: elegir una carpeta local de `sources` (todavía no hay
-  subida de archivos, se sigue asumiendo que las imágenes ya están en
-  disco, como en v1.0), `layout.mode`, un color principal, `recolor.mode`,
-  cantidad de capas, semilla con "rehacer". No es el editor visual completo
-  de specs todavía (falta crop, mosaic, repeat, stain, shapes, text,
-  finish, capas múltiples con ajustes propios).
+- Modelo: ya no es "carpeta entera, el motor elige cuántas capas al azar".
+  Se buscan imágenes de una carpeta (`SourceFolderPicker`) y se eligen a
+  mano por clic (selección múltiple, cada clic agrega o saca); cada imagen
+  seleccionada entra siempre, con su propio submenú de ajustes de capa
+  (`ImageConfigPanel`, columna del medio, scrolleable): rotar/voltear,
+  opacidad, modo de fusión, color propio, repetición lineal (con
+  espaciado) o caleidoscopio (`pivot`/`sectors`, con espaciado), mosaico,
+  posición manual (arrastrar en un cuadrito que representa el lienzo) y
+  orden de apilado (`z`, atrás/adelante). Todo con botones/sliders, sin
+  texto libre salvo la ruta de la carpeta. Un botón "duplicar" por imagen
+  permite que la misma foto entre dos veces al collage como dos capas
+  independientes (identificadas por `id`, no por ruta).
+- Parámetros globales que quedan en `ParamControls`: `layout.mode`, color
+  principal del lote, `recolor.mode`, semilla con "rehacer".
+- El mosaico tiene una compensación en `api/routes_render.py`
+  (`_sin_explosion_de_mosaico`): el motor salta el resize automático al
+  hueco del layout cuando hay `mosaic` sin `resize` propio, así que sin
+  esto una foto real (miles de px) más una grilla de 3x3 terminaba en una
+  capa de decenas de miles de px. Ver el docstring ahí si vuelve a pasar
+  algo raro con mosaico.
 
-Pendiente, deliberadamente fuera de este MVP:
+Pendiente, deliberadamente fuera de esto:
 
-- Subida/almacenamiento real de imágenes (sigue siendo una carpeta local).
-- Editor visual de specs completo.
+- Subida/almacenamiento real de imágenes (sigue siendo una carpeta local
+  en disco, no hay upload de archivos desde el navegador).
+- El resto del editor visual de specs: `crop`, `stain`, figuras (`shape`),
+  texto (`text`), y los ajustes globales de `background`/`finish`.
 - Todo lo de hosting multi-usuario (v3.0, no ahora): auth, storage que no
   sea disco local, límites de cuota.
 

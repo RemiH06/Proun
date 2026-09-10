@@ -71,6 +71,11 @@ export function ImageConfigPanel({ config: c, options, onUpdate, onRemove, onDup
       </div>
 
       <div className="control-group">
+        <span className="control-label">Capas (atrás / adelante)</span>
+        <Stepper value={c.z} min={-10} max={10} onChange={(z) => onUpdate({ z })} />
+      </div>
+
+      <div className="control-group">
         <span className="control-label">Rotar</span>
         <div className="button-row">
           {ANGLES.map((a) => (
