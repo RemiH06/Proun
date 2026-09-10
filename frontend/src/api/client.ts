@@ -4,15 +4,20 @@
 
 export type SourceImage = { path: string; name: string }
 export type SourceList = { path: string; count: number; images: SourceImage[] }
-export type Options = { layout_modes: string[]; recolor_modes: string[]; blend_modes: string[] }
+export type Options = {
+  layout_modes: string[]
+  recolor_modes: string[]
+  blend_modes: string[]
+  shape_kinds: string[]
+}
 
 export type FlipMode = 'none' | 'horizontal' | 'vertical' | 'both'
 
 export type RepeatConfig =
   | null
   // dirX/dirY: dirección (-1/0/1 por eje, del compás). spacing: qué tan
-  // separada sale cada copia (1 = pegada sin solapar, menos = se solapan,
-  // más = deja hueco); es lo que multiplica a la dirección para dar el
+  // separada sale cada copia (1 = pegada sin solapar, menos se solapan,
+  // más deja hueco); es lo que multiplica a la dirección para dar el
   // `step` real que espera el motor.
   | { kind: 'linear'; dirX: -1 | 0 | 1; dirY: -1 | 0 | 1; spacing: number; times: number; mirror: boolean }
   // pivotDirX/pivotDirY: de qué lado queda el pivote (mismo compás que el
@@ -25,16 +30,13 @@ export type MosaicConfig = null | { cols: number; rows: number; mirror: boolean 
 // Fracción [0,1] del lienzo; null = el layout la ubica solo, como siempre.
 export type PositionConfig = null | { x: number; y: number }
 
-// Una imagen elegida a mano, con sus propios ajustes de capa. Los valores
-// "por defecto" (0°, sin voltear, opacidad 1, blend normal, sin color
-// propio, sin repeat, sin mosaico) no viajan al backend: toLayerDict() solo
-// manda las claves que de verdad cambian algo. `id` identifica esta capa en
-// particular, no la imagen: la misma foto puede entrar dos veces al
-// collage como dos capas independientes, cada una con su propio `id`.
-export type ImageConfig = {
+export type ShapeKind = 'rect' | 'circle' | 'triangle' | 'diamond' | 'polygon'
+
+// Ajustes que comparten las tres clases de capa (imagen, figura, texto).
+// Los valores "por defecto" no viajan al backend: toLayerDict() solo manda
+// las claves que de verdad cambian algo.
+type CommonLayer = {
   id: string
-  path: string
-  name: string
   angle: 0 | 90 | 180 | 270
   flipH: boolean
   flipV: boolean
@@ -47,13 +49,34 @@ export type ImageConfig = {
   // Orden de apilado: 0 = donde caiga por sorteo (igual que no declararlo).
   // Más alto pinta más arriba (adelante), más bajo pinta más abajo (atrás).
   z: number
+  // null = sin recortar. Si no, algo como "1:1" o "16:9".
+  cropAspect: string | null
+  // 0 = sin manchar.
+  stainAmount: number
 }
 
-export function newImageConfig(path: string, name: string): ImageConfig {
+// `id` identifica esta capa en particular, no el archivo/figura/texto: la
+// misma imagen puede entrar dos veces al collage como dos capas
+// independientes, cada una con su propio `id`.
+export type LayerConfig =
+  | (CommonLayer & { kind: 'image'; path: string; name: string })
+  | (CommonLayer & {
+      kind: 'shape'
+      shapeKind: ShapeKind
+      sides: number
+      outlineWidth: number
+      outlineInset: number
+    })
+  | (CommonLayer & {
+      kind: 'text'
+      text: string
+      weight: 'regular' | 'bold'
+      align: 'left' | 'center' | 'right'
+    })
+
+function commonDefaults(): CommonLayer {
   return {
     id: crypto.randomUUID(),
-    path,
-    name,
     angle: 0,
     flipH: false,
     flipV: false,
@@ -64,18 +87,44 @@ export function newImageConfig(path: string, name: string): ImageConfig {
     mosaic: null,
     position: null,
     z: 0,
+    cropAspect: null,
+    stainAmount: 0,
   }
 }
 
-function flipMode(cfg: ImageConfig): FlipMode {
+export function newImageLayer(path: string, name: string): LayerConfig {
+  return { ...commonDefaults(), kind: 'image', path, name }
+}
+
+export function newShapeLayer(shapeKind: ShapeKind = 'circle'): LayerConfig {
+  return { ...commonDefaults(), kind: 'shape', shapeKind, sides: 6, outlineWidth: 0, outlineInset: 0.12 }
+}
+
+export function newTextLayer(): LayerConfig {
+  return { ...commonDefaults(), kind: 'text', text: '', weight: 'bold', align: 'left' }
+}
+
+function flipMode(cfg: CommonLayer): FlipMode {
   if (cfg.flipH && cfg.flipV) return 'both'
   if (cfg.flipH) return 'horizontal'
   if (cfg.flipV) return 'vertical'
   return 'none'
 }
 
-export function toLayerDict(cfg: ImageConfig): Record<string, unknown> {
-  const layer: Record<string, unknown> = { src: cfg.path }
+export function toLayerDict(cfg: LayerConfig): Record<string, unknown> {
+  const layer: Record<string, unknown> = {}
+
+  if (cfg.kind === 'image') {
+    layer.src = cfg.path
+  } else if (cfg.kind === 'shape') {
+    layer.shape = cfg.shapeKind === 'polygon' ? { kind: 'polygon', sides: cfg.sides } : cfg.shapeKind
+    if (cfg.outlineWidth > 0) {
+      layer.outline = { width: cfg.outlineWidth, inset: cfg.outlineInset }
+    }
+  } else {
+    layer.text = { text: cfg.text, weight: cfg.weight, align: cfg.align }
+  }
+
   if (cfg.angle !== 0 || cfg.flipH || cfg.flipV) {
     layer.rotate = { angles: [cfg.angle], flip: flipMode(cfg) }
   }
@@ -102,15 +151,93 @@ export function toLayerDict(cfg: ImageConfig): Record<string, unknown> {
     layer.position = [cfg.position.x, cfg.position.y]
   }
   if (cfg.z !== 0) layer.z = cfg.z
+  if (cfg.cropAspect) layer.crop = { aspect: cfg.cropAspect }
+  if (cfg.stainAmount > 0) layer.stain = { amount: cfg.stainAmount }
+
   return layer
 }
 
+export type BackgroundMode = 'auto' | 'solid' | 'gradient'
+export type BackgroundDirection = 'vertical' | 'horizontal' | 'diagonal' | 'radial'
+
+export type BackgroundConfig = {
+  mode: BackgroundMode
+  solidColor: string
+  gradientFrom: string
+  gradientTo: string
+  direction: BackgroundDirection
+  stainAmount: number
+}
+
+export function defaultBackground(): BackgroundConfig {
+  return {
+    mode: 'auto',
+    solidColor: '#f2efe8',
+    gradientFrom: '#f2efe8',
+    gradientTo: '#101018',
+    direction: 'vertical',
+    stainAmount: 0,
+  }
+}
+
+function toBackgroundDict(bg: BackgroundConfig): Record<string, unknown> | string | undefined {
+  if (bg.mode === 'auto' && bg.stainAmount === 0) return undefined
+  if (bg.mode === 'auto') return { solid: 'auto', stain: { amount: bg.stainAmount } }
+  const base: Record<string, unknown> =
+    bg.mode === 'solid'
+      ? { solid: bg.solidColor }
+      : { gradient: [bg.gradientFrom, bg.gradientTo], direction: bg.direction }
+  if (bg.stainAmount > 0) base.stain = { amount: bg.stainAmount }
+  return base
+}
+
+export type OverlayConfig = { on: boolean; color: string; opacity: number; mode: string }
+
+export type FinishConfig = {
+  vignette: number
+  grain: number
+  blur: number
+  contrast: number
+  brightness: number
+  saturation: number
+  overlay: OverlayConfig
+  stainAmount: number
+}
+
+export function defaultFinish(): FinishConfig {
+  return {
+    vignette: 0,
+    grain: 0,
+    blur: 0,
+    contrast: 1,
+    brightness: 1,
+    saturation: 1,
+    overlay: { on: false, color: '#d94f3d', opacity: 0.15, mode: 'soft_light' },
+    stainAmount: 0,
+  }
+}
+
+function toFinishDict(f: FinishConfig): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {}
+  if (f.vignette > 0) out.vignette = f.vignette
+  if (f.grain > 0) out.grain = f.grain
+  if (f.blur > 0) out.blur = f.blur
+  if (f.contrast !== 1) out.contrast = f.contrast
+  if (f.brightness !== 1) out.brightness = f.brightness
+  if (f.saturation !== 1) out.saturation = f.saturation
+  if (f.overlay.on) out.overlay = { color: f.overlay.color, opacity: f.overlay.opacity, mode: f.overlay.mode }
+  if (f.stainAmount > 0) out.stain = { amount: f.stainAmount }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 export type PreviewParams = {
-  images: ImageConfig[]
+  layers: LayerConfig[]
   layoutMode: string
   color: string
   recolorMode: string
   seed: number
+  background: BackgroundConfig
+  finish: FinishConfig
 }
 
 export type ExportParams = PreviewParams & { resolution: string }
@@ -133,11 +260,13 @@ async function readError(res: Response): Promise<string> {
 
 function toBody(p: PreviewParams) {
   return {
-    images: p.images.map(toLayerDict),
+    layers: p.layers.map(toLayerDict),
     layout_mode: p.layoutMode,
     color: p.color,
     recolor_mode: p.recolorMode,
     seed: p.seed,
+    background: toBackgroundDict(p.background),
+    finish: toFinishDict(p.finish),
   }
 }
 

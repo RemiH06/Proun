@@ -9,15 +9,20 @@ historial de commits, no aquí.
 
 ## Interfaz gráfica en React (v2.0)
 
-En construcción. Ya funciona: elegir imágenes a mano (selección múltiple
-por clic), submenú de ajustes por imagen (rotar/voltear, opacidad, fusión,
-color propio, repeat lineal y caleidoscopio con espaciado, mosaico,
-posición arrastrable, orden de capas, duplicar), parámetros globales
-(layout, color, recoloreado, semilla) y exportar. Lo que falta está
-documentado en `CLAUDE.md`, sección "v2.0: interfaz gráfica en React":
-subida real de imágenes (hoy sigue siendo una carpeta local), y el resto
-del editor visual (`crop`, `stain`, figuras, texto, `background`/`finish`
-globales).
+Completa para uso local. El editor visual ya cubre todo el modelo de
+capas del motor: elegir imágenes a mano (selección múltiple por clic) o
+agregar figuras/texto, submenú de ajustes por capa (rotar/voltear,
+opacidad, fusión, color propio, recorte por proporción, manchas, repeat
+lineal y caleidoscopio con espaciado, mosaico, posición arrastrable,
+orden de capas, duplicar), ajustes globales de fondo (auto/sólido/
+degradado + manchas) y acabado (viñeta, grano, desenfoque, contraste,
+brillo, saturación, veladura, manchas), parámetros del lote (layout,
+color, recoloreado, semilla) y exportar. Detalle en `CLAUDE.md`, sección
+"v2.0: interfaz gráfica en React".
+
+La subida real de imágenes se movió a v3.0 (hosteada): mientras sea local
+de un solo usuario, una carpeta en disco alcanza, no hace falta resolver
+storage.
 
 ## Logo de Proun
 

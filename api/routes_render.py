@@ -44,8 +44,8 @@ def _build_spec(body: PreviewRequest, resolution: str, fmt: str = "png",
                 output: str = "wallpapers"):
     lado_mayor = max(spec_module.parse_resolutions([resolution])[0])
     sources = [
-        _sin_explosion_de_mosaico(img.model_dump(exclude_none=True), lado_mayor)
-        for img in body.images
+        _sin_explosion_de_mosaico(capa.model_dump(exclude_none=True), lado_mayor)
+        for capa in body.layers
     ]
     data = {
         "sources": sources,
@@ -54,6 +54,8 @@ def _build_spec(body: PreviewRequest, resolution: str, fmt: str = "png",
         "seeds": [body.seed],
         "layout": {"mode": body.layout_mode},
         "defaults": {"recolor": {"mode": body.recolor_mode}},
+        "background": body.background if body.background is not None else "auto",
+        "finish": body.finish or {},
         "format": fmt,
         "output": output,
     }

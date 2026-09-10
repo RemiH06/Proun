@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from proun import layout
 from proun.errors import SpecError
-from proun.ops import blend, recolor
+from proun.ops import blend, recolor, shapes
 
 from . import routes_render, routes_sources
 
@@ -24,11 +24,12 @@ app.include_router(routes_render.router, prefix="/api")
 def options() -> dict:
     """Los controles del frontend leen sus opciones de acá en vez de tener
     una lista aparte que se pueda desincronizar de `proun.layout`/`recolor`/
-    `proun.ops.blend`."""
+    `proun.ops.blend`/`proun.ops.shapes`."""
     return {
         "layout_modes": list(layout.MODES),
         "recolor_modes": list(recolor.MODES),
         "blend_modes": list(blend.MODES),
+        "shape_kinds": list(shapes.KINDS),
     }
 
 

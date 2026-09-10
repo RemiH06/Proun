@@ -268,6 +268,34 @@
   white-space: nowrap;
 }
 
+.shape-swatch {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  background: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.shape-swatch-rect {
+  clip-path: none;
+}
+
+.shape-swatch-circle {
+  border-radius: 50%;
+}
+
+.shape-swatch-triangle {
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+
+.shape-swatch-diamond {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.shape-swatch-polygon {
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+
 .duplicate,
 .remove {
   flex: 0 0 auto;

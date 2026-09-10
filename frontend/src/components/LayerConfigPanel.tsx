@@ -1,12 +1,12 @@
-import type { ImageConfig, Options } from '../api/client'
+import type { LayerConfig, Options, ShapeKind } from '../api/client'
 import { thumbnailUrl } from '../api/client'
 import { PositionPad } from './PositionPad'
 import { Stepper } from './Stepper'
 
 type Props = {
-  config: ImageConfig
+  config: LayerConfig
   options: Options | null
-  onUpdate: (patch: Partial<ImageConfig>) => void
+  onUpdate: (patch: Partial<LayerConfig>) => void
   onRemove: () => void
   onDuplicate: () => void
 }
@@ -47,16 +47,57 @@ const GRIDS: Array<[number, number]> = [
   [1, 4],
 ]
 
-export function ImageConfigPanel({ config: c, options, onUpdate, onRemove, onDuplicate }: Props) {
-  const blendModes = options?.blend_modes ?? [c.blend]
+const ASPECTOS: Array<{ label: string; value: string | null }> = [
+  { label: 'libre', value: null },
+  { label: '1:1', value: '1:1' },
+  { label: '4:3', value: '4:3' },
+  { label: '3:4', value: '3:4' },
+  { label: '16:9', value: '16:9' },
+  { label: '9:16', value: '9:16' },
+]
 
-  return (
-    <section className="panel image-panel">
-      <div className="image-panel-header">
+const SHAPE_LABELS: Record<ShapeKind, string> = {
+  rect: 'rectángulo',
+  circle: 'círculo',
+  triangle: 'triángulo',
+  diamond: 'rombo',
+  polygon: 'polígono',
+}
+
+function encabezado(c: LayerConfig) {
+  if (c.kind === 'image') {
+    return (
+      <>
         <img className="image-panel-thumb" src={thumbnailUrl(c.path, 64)} alt={c.name} />
         <span className="image-panel-name" title={c.name}>
           {c.name}
         </span>
+      </>
+    )
+  }
+  if (c.kind === 'shape') {
+    return (
+      <>
+        <span className={`shape-swatch shape-swatch-${c.shapeKind}`} />
+        <span className="image-panel-name">{SHAPE_LABELS[c.shapeKind]}</span>
+      </>
+    )
+  }
+  return (
+    <span className="image-panel-name" title={c.text}>
+      {c.text.trim() || 'texto vacío'}
+    </span>
+  )
+}
+
+export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDuplicate }: Props) {
+  const blendModes = options?.blend_modes ?? [c.blend]
+  const shapeKinds = (options?.shape_kinds ?? ['rect', 'circle', 'triangle', 'diamond', 'polygon']) as ShapeKind[]
+
+  return (
+    <section className="panel image-panel">
+      <div className="image-panel-header">
+        {encabezado(c)}
         <button type="button" className="duplicate" onClick={onDuplicate} title="agregar otra vez">
           +
         </button>
@@ -64,6 +105,100 @@ export function ImageConfigPanel({ config: c, options, onUpdate, onRemove, onDup
           ×
         </button>
       </div>
+
+      {c.kind === 'text' && (
+        <div className="control-group">
+          <span className="control-label">Texto</span>
+          <input
+            type="text"
+            className="text-input"
+            value={c.text}
+            placeholder="PROUN"
+            onChange={(e) => onUpdate({ text: e.target.value })}
+          />
+          <div className="button-row">
+            <button
+              type="button"
+              className={c.weight === 'regular' ? 'active' : ''}
+              onClick={() => onUpdate({ weight: 'regular' })}
+            >
+              regular
+            </button>
+            <button
+              type="button"
+              className={c.weight === 'bold' ? 'active' : ''}
+              onClick={() => onUpdate({ weight: 'bold' })}
+            >
+              bold
+            </button>
+          </div>
+          <div className="button-row">
+            <button
+              type="button"
+              className={c.align === 'left' ? 'active' : ''}
+              onClick={() => onUpdate({ align: 'left' })}
+            >
+              izq
+            </button>
+            <button
+              type="button"
+              className={c.align === 'center' ? 'active' : ''}
+              onClick={() => onUpdate({ align: 'center' })}
+            >
+              centro
+            </button>
+            <button
+              type="button"
+              className={c.align === 'right' ? 'active' : ''}
+              onClick={() => onUpdate({ align: 'right' })}
+            >
+              der
+            </button>
+          </div>
+        </div>
+      )}
+
+      {c.kind === 'shape' && (
+        <div className="control-group">
+          <span className="control-label">Figura</span>
+          <div className="button-row wrap">
+            {shapeKinds.map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={c.shapeKind === k ? 'active' : ''}
+                onClick={() => onUpdate({ shapeKind: k })}
+              >
+                {SHAPE_LABELS[k]}
+              </button>
+            ))}
+          </div>
+          {c.shapeKind === 'polygon' && (
+            <div className="row">
+              <span className="control-label">lados</span>
+              <Stepper value={c.sides} min={3} max={12} onChange={(sides) => onUpdate({ sides })} />
+            </div>
+          )}
+          <span className="control-label">contorno (ancho)</span>
+          <input
+            type="range"
+            min={0}
+            max={0.3}
+            step={0.01}
+            value={c.outlineWidth}
+            onChange={(e) => onUpdate({ outlineWidth: Number(e.target.value) })}
+          />
+          <span className="control-label">contorno (qué tan adentro)</span>
+          <input
+            type="range"
+            min={0}
+            max={0.5}
+            step={0.01}
+            value={c.outlineInset}
+            onChange={(e) => onUpdate({ outlineInset: Number(e.target.value) })}
+          />
+        </div>
+      )}
 
       <div className="control-group">
         <span className="control-label">Posición</span>
@@ -157,6 +292,43 @@ export function ImageConfigPanel({ config: c, options, onUpdate, onRemove, onDup
             onChange={(e) => onUpdate({ color: e.target.value })}
           />
         </div>
+      </div>
+
+      <div className="control-group">
+        <span className="control-label">Recorte</span>
+        <div className="button-row wrap">
+          {ASPECTOS.map(({ label, value }) => (
+            <button
+              key={label}
+              type="button"
+              className={c.cropAspect === value ? 'active' : ''}
+              onClick={() => onUpdate({ cropAspect: value })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="control-group">
+        <span className="control-label">Manchas</span>
+        <div className="button-row">
+          <button
+            type="button"
+            className={c.stainAmount === 0 ? 'active' : ''}
+            onClick={() => onUpdate({ stainAmount: 0 })}
+          >
+            sin manchar
+          </button>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={c.stainAmount}
+          onChange={(e) => onUpdate({ stainAmount: Number(e.target.value) })}
+        />
       </div>
 
       <div className="control-group">

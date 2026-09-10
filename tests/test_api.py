@@ -14,9 +14,9 @@ from api.cache import cache
 from api.main import app
 from api.paths import PROJECT_ROOT, resolve_sources_path
 from api.routes_render import _build_spec, _sin_explosion_de_mosaico
-from api.schemas import ImageLayer, PreviewRequest
+from api.schemas import LayerSpec, PreviewRequest
 from proun import compose, layout, loading
-from proun.ops import blend, recolor
+from proun.ops import blend, recolor, shapes
 
 RAIZ = Path(tempfile.mkdtemp(prefix="proun-api-"))
 FUENTES = RAIZ / "fuentes"
@@ -41,8 +41,8 @@ def tearDownModule():
     shutil.rmtree(RAIZ, ignore_errors=True)
 
 
-def imagenes(*overrides):
-    """Una imagen por override (dict de ajustes de capa, "src" se agrega
+def capas(*overrides):
+    """Una capa de imagen por override (dict de ajustes, "src" se agrega
     solo). Sin overrides, las cuatro fotos de prueba sin ajustes propios."""
     if not overrides:
         return [{"src": str(a)} for a in ARCHIVOS]
@@ -51,7 +51,7 @@ def imagenes(*overrides):
 
 def cuerpo(**extra):
     return {
-        "images": imagenes(),
+        "layers": capas(),
         "layout_mode": "scatter",
         "color": "#3ba7ff",
         "recolor_mode": "duotone",
@@ -82,6 +82,7 @@ class Opciones(unittest.TestCase):
         self.assertEqual(datos["layout_modes"], list(layout.MODES))
         self.assertEqual(datos["recolor_modes"], list(recolor.MODES))
         self.assertEqual(datos["blend_modes"], list(blend.MODES))
+        self.assertEqual(datos["shape_kinds"], list(shapes.KINDS))
 
 
 class Fuentes(unittest.TestCase):
@@ -115,8 +116,8 @@ class Preview(unittest.TestCase):
         self.assertEqual(a.content, b.content)
 
     def test_una_imagen_rotada_da_un_resultado_distinto(self):
-        recto = cuerpo(images=imagenes({}, {}))
-        girado = cuerpo(images=imagenes({"rotate": {"angles": [90]}}, {}))
+        recto = cuerpo(layers=capas({}, {}))
+        girado = cuerpo(layers=capas({"rotate": {"angles": [90]}}, {}))
         a = client.post("/api/preview", json=recto)
         b = client.post("/api/preview", json=girado)
         self.assertEqual(a.status_code, 200)
@@ -126,8 +127,8 @@ class Preview(unittest.TestCase):
     def test_una_posicion_explicita_ubica_la_capa_ahi(self):
         # Dos posiciones bien separadas tienen que dar composiciones
         # distintas; si position no llegara al motor, darían lo mismo.
-        arriba_izq = cuerpo(images=imagenes({"position": [0.1, 0.1]}))
-        abajo_der = cuerpo(images=imagenes({"position": [0.9, 0.9]}))
+        arriba_izq = cuerpo(layers=capas({"position": [0.1, 0.1]}))
+        abajo_der = cuerpo(layers=capas({"position": [0.9, 0.9]}))
         a = client.post("/api/preview", json=arriba_izq)
         b = client.post("/api/preview", json=abajo_der)
         self.assertEqual(a.status_code, 200)
@@ -139,7 +140,7 @@ class Preview(unittest.TestCase):
         # propio color: la de z más alto tiene que quedar arriba (se ve su
         # color en el centro), sin importar en qué orden se sortearon.
         centro = {"position": [0.5, 0.5]}
-        arriba_azul = cuerpo(images=imagenes(
+        arriba_azul = cuerpo(layers=capas(
             {**centro, "z": -5, "color": "#ff0000"},
             {**centro, "z": 5, "color": "#2244ff"},
         ))
@@ -149,7 +150,7 @@ class Preview(unittest.TestCase):
         r, g, b = imagen.getpixel((imagen.width // 2, imagen.height // 2))[:3]
         self.assertGreater(b, r)
 
-        arriba_roja = cuerpo(images=imagenes(
+        arriba_roja = cuerpo(layers=capas(
             {**centro, "z": 5, "color": "#ff0000"},
             {**centro, "z": -5, "color": "#2244ff"},
         ))
@@ -159,12 +160,65 @@ class Preview(unittest.TestCase):
         self.assertGreater(r2, b2)
 
     def test_caleidoscopio_no_revienta_y_cambia_el_resultado(self):
-        sin_repeat = cuerpo(images=imagenes({}))
+        sin_repeat = cuerpo(layers=capas({}))
         con_caleidoscopio = cuerpo(
-            images=imagenes({"repeat": {"pivot": [0.5, 0], "sectors": 4}})
+            layers=capas({"repeat": {"pivot": [0.5, 0], "sectors": 4}})
         )
         a = client.post("/api/preview", json=sin_repeat)
         b = client.post("/api/preview", json=con_caleidoscopio)
+        self.assertEqual(a.status_code, 200)
+        self.assertEqual(b.status_code, 200)
+        self.assertNotEqual(a.content, b.content)
+
+    def test_un_crop_distinto_cambia_el_resultado(self):
+        libre = cuerpo(layers=capas({}))
+        cuadrado = cuerpo(layers=capas({"crop": {"aspect": "1:1"}}))
+        a = client.post("/api/preview", json=libre)
+        b = client.post("/api/preview", json=cuadrado)
+        self.assertEqual(a.status_code, 200)
+        self.assertEqual(b.status_code, 200)
+        self.assertNotEqual(a.content, b.content)
+
+    def test_stain_por_capa_cambia_el_resultado(self):
+        sin_mancha = cuerpo(layers=capas({}))
+        manchada = cuerpo(layers=capas({"stain": {"amount": 0.9}}))
+        a = client.post("/api/preview", json=sin_mancha)
+        b = client.post("/api/preview", json=manchada)
+        self.assertEqual(a.status_code, 200)
+        self.assertEqual(b.status_code, 200)
+        self.assertNotEqual(a.content, b.content)
+
+    def test_una_figura_sola_no_revienta(self):
+        resp = client.post("/api/preview", json=cuerpo(layers=[{"shape": "circle"}]))
+        self.assertEqual(resp.status_code, 200)
+        Image.open(io.BytesIO(resp.content))  # no tira, es un PNG real
+
+    def test_un_texto_solo_no_revienta(self):
+        resp = client.post("/api/preview", json=cuerpo(layers=[{"text": "PROUN"}]))
+        self.assertEqual(resp.status_code, 200)
+        Image.open(io.BytesIO(resp.content))
+
+    def test_dos_textos_distintos_dan_resultados_distintos(self):
+        a = client.post("/api/preview", json=cuerpo(layers=[{"text": "PROUN"}]))
+        b = client.post("/api/preview", json=cuerpo(layers=[{"text": "OTRO"}]))
+        self.assertEqual(a.status_code, 200)
+        self.assertEqual(b.status_code, 200)
+        self.assertNotEqual(a.content, b.content)
+
+    def test_background_explicito_cambia_el_resultado(self):
+        auto = cuerpo()
+        rojo = cuerpo(background={"solid": "#ff0000"})
+        a = client.post("/api/preview", json=auto)
+        b = client.post("/api/preview", json=rojo)
+        self.assertEqual(a.status_code, 200)
+        self.assertEqual(b.status_code, 200)
+        self.assertNotEqual(a.content, b.content)
+
+    def test_finish_explicito_cambia_el_resultado(self):
+        sin_acabado = cuerpo()
+        con_vineta = cuerpo(finish={"vignette": 0.8})
+        a = client.post("/api/preview", json=sin_acabado)
+        b = client.post("/api/preview", json=con_vineta)
         self.assertEqual(a.status_code, 200)
         self.assertEqual(b.status_code, 200)
         self.assertNotEqual(a.content, b.content)
@@ -193,9 +247,9 @@ class CacheDeGeometria(unittest.TestCase):
 
     def test_no_rehace_geometria_si_solo_cambia_opacity_o_blend(self):
         with patch.object(compose, "prepare", wraps=compose.prepare) as prep:
-            client.post("/api/preview", json=cuerpo(images=imagenes({"opacity": 1.0})))
-            client.post("/api/preview", json=cuerpo(images=imagenes({"opacity": 0.4})))
-            client.post("/api/preview", json=cuerpo(images=imagenes({"opacity": 0.4, "blend": "screen"})))
+            client.post("/api/preview", json=cuerpo(layers=capas({"opacity": 1.0})))
+            client.post("/api/preview", json=cuerpo(layers=capas({"opacity": 0.4})))
+            client.post("/api/preview", json=cuerpo(layers=capas({"opacity": 0.4, "blend": "screen"})))
             self.assertEqual(prep.call_count, 1)
 
     def test_si_cambia_el_layout_si_rehace_geometria(self):
@@ -206,8 +260,8 @@ class CacheDeGeometria(unittest.TestCase):
 
     def test_si_cambia_rotate_si_rehace_geometria(self):
         with patch.object(compose, "prepare", wraps=compose.prepare) as prep:
-            client.post("/api/preview", json=cuerpo(images=imagenes({})))
-            client.post("/api/preview", json=cuerpo(images=imagenes({"rotate": {"angles": [90]}})))
+            client.post("/api/preview", json=cuerpo(layers=capas({})))
+            client.post("/api/preview", json=cuerpo(layers=capas({"rotate": {"angles": [90]}})))
             self.assertEqual(prep.call_count, 2)
 
 
@@ -220,18 +274,18 @@ class Mosaico(unittest.TestCase):
     no el mosaico del motor en sí (eso ya lo prueba `tests/test_mosaic.py`)."""
 
     def test_agrega_resize_de_compensacion(self):
-        body = PreviewRequest(images=[ImageLayer(src=str(GRANDE), mosaic={"grid": [3, 3]})])
+        body = PreviewRequest(layers=[LayerSpec(src=str(GRANDE), mosaic={"grid": [3, 3]})])
         built = _build_spec(body, "800x600")
         self.assertIsNotNone(built.sources[0].resize)
         self.assertIn("max_side", built.sources[0].resize)
 
     def test_no_toca_capas_sin_mosaico(self):
-        body = PreviewRequest(images=[ImageLayer(src=str(GRANDE))])
+        body = PreviewRequest(layers=[LayerSpec(src=str(GRANDE))])
         built = _build_spec(body, "800x600")
         self.assertIsNone(built.sources[0].resize)
 
     def test_respeta_un_resize_propio(self):
-        # Prueba directa del helper con dicts planos: ImageLayer (el schema
+        # Prueba directa del helper con dicts planos: LayerSpec (el schema
         # que expone la API) todavía no tiene un campo "resize" propio, así
         # que esta rama solo se puede ejercitar así por ahora.
         capa = {"src": str(GRANDE), "mosaic": {"grid": [3, 3]}, "resize": {"max_side": 111}}
@@ -246,7 +300,7 @@ class Mosaico(unittest.TestCase):
     def test_el_resultado_final_no_explota_de_tamano(self):
         # Reproduce el bug real: antes de la compensación, una foto de
         # 3000x2000 con grid [3,3] terminaba en decenas de miles de px.
-        body = PreviewRequest(images=[ImageLayer(src=str(GRANDE), mosaic={"grid": [3, 3]})])
+        body = PreviewRequest(layers=[LayerSpec(src=str(GRANDE), mosaic={"grid": [3, 3]})])
         built = _build_spec(body, "800x600")
         current = compose.plan(built, built.seeds[0])
         shaped = compose.prepare(built, current, built.resolutions[0])
@@ -257,8 +311,8 @@ class Mosaico(unittest.TestCase):
 
 
 class Errores(unittest.TestCase):
-    def test_sin_imagenes_da_400_con_el_mensaje_en_espanol(self):
-        resp = client.post("/api/preview", json=cuerpo(images=[]))
+    def test_sin_capas_da_400_con_el_mensaje_en_espanol(self):
+        resp = client.post("/api/preview", json=cuerpo(layers=[]))
         self.assertEqual(resp.status_code, 400)
         self.assertIn("imagen", resp.json()["detail"])
 

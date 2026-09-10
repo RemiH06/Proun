@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { fetchOptions, preview, type Options } from './api/client'
+import { AddLayerButtons } from './components/AddLayerButtons'
+import { CanvasControls } from './components/CanvasControls'
 import { ExportButton } from './components/ExportButton'
-import { ImageConfigList } from './components/ImageConfigList'
+import { LayerConfigList } from './components/LayerConfigList'
 import { ParamControls } from './components/ParamControls'
 import { PreviewPane } from './components/PreviewPane'
 import { SourceFolderPicker } from './components/SourceFolderPicker'
@@ -10,7 +12,19 @@ import { useDebouncedValue } from './hooks/useDebouncedValue'
 import { useSpecState } from './hooks/useSpecState'
 
 export default function App() {
-  const { state, update, reroll, toggleImage, updateImage, removeImage, duplicateImage } = useSpecState()
+  const {
+    state,
+    update,
+    reroll,
+    toggleImage,
+    addShape,
+    addText,
+    updateLayer,
+    removeLayer,
+    duplicateLayer,
+    updateBackground,
+    updateFinish,
+  } = useSpecState()
   const [folderPath, setFolderPath] = useState('')
   const [options, setOptions] = useState<Options | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -30,7 +44,7 @@ export default function App() {
   const debounced = useDebouncedValue(state, 300)
 
   useEffect(() => {
-    if (debounced.images.length === 0) {
+    if (debounced.layers.length === 0) {
       setImageUrl(null)
       return
     }
@@ -58,7 +72,9 @@ export default function App() {
     }
   }, [debounced])
 
-  const selectedPaths = new Set(state.images.map((img) => img.path))
+  const selectedPaths = new Set(
+    state.layers.filter((capa) => capa.kind === 'image').map((capa) => capa.path),
+  )
 
   return (
     <div className="app">
@@ -74,15 +90,22 @@ export default function App() {
             selectedPaths={selectedPaths}
             onToggle={toggleImage}
           />
+          <AddLayerButtons onAddShape={addShape} onAddText={addText} />
           <ParamControls state={state} options={options} onUpdate={update} onReroll={reroll} />
-          <ExportButton params={state} disabled={state.images.length === 0} />
+          <CanvasControls
+            background={state.background}
+            finish={state.finish}
+            onUpdateBackground={updateBackground}
+            onUpdateFinish={updateFinish}
+          />
+          <ExportButton params={state} disabled={state.layers.length === 0} />
         </div>
-        <ImageConfigList
-          images={state.images}
+        <LayerConfigList
+          layers={state.layers}
           options={options}
-          onUpdate={updateImage}
-          onRemove={removeImage}
-          onDuplicate={duplicateImage}
+          onUpdate={updateLayer}
+          onRemove={removeLayer}
+          onDuplicate={duplicateLayer}
         />
         <div className="column">
           <PreviewPane imageUrl={imageUrl} loading={loading} error={error} />

@@ -137,20 +137,29 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   `docs/index.html` (`frontend/src/styles/tokens.css`), siguiendo el
   criterio de la skill `site-launch-checklist` instalada en
   `.claude/skills/`.
-- Modelo: ya no es "carpeta entera, el motor elige cuántas capas al azar".
-  Se buscan imágenes de una carpeta (`SourceFolderPicker`) y se eligen a
-  mano por clic (selección múltiple, cada clic agrega o saca); cada imagen
-  seleccionada entra siempre, con su propio submenú de ajustes de capa
-  (`ImageConfigPanel`, columna del medio, scrolleable): rotar/voltear,
-  opacidad, modo de fusión, color propio, repetición lineal (con
+- Modelo: ya no es "carpeta entera, el motor elige cuántas capas al azar",
+  y ya no es solo imágenes: el lienzo es una lista de **capas**
+  (`LayerConfig`, unión discriminada por `kind`: `image` | `shape` |
+  `text`). Las imágenes se buscan en una carpeta (`SourceFolderPicker`) y
+  se eligen a mano por clic (selección múltiple, cada clic agrega o
+  saca); figuras y texto se agregan con `AddLayerButtons`. Cada capa
+  entra con su propio submenú de ajustes (`LayerConfigPanel`, columna del
+  medio, scrolleable): rotar/voltear, opacidad, modo de fusión, color
+  propio, recorte por proporción (`crop.aspect`, botones libre/1:1/4:3/
+  3:4/16:9/9:16), manchas propias (`stain`), repetición lineal (con
   espaciado) o caleidoscopio (`pivot`/`sectors`, con espaciado), mosaico,
   posición manual (arrastrar en un cuadrito que representa el lienzo) y
-  orden de apilado (`z`, atrás/adelante). Todo con botones/sliders, sin
-  texto libre salvo la ruta de la carpeta. Un botón "duplicar" por imagen
-  permite que la misma foto entre dos veces al collage como dos capas
-  independientes (identificadas por `id`, no por ruta).
+  orden de apilado (`z`, atrás/adelante); las capas de figura suman tipo
+  (`shape`, botones) y contorno, las de texto suman el input de texto
+  (el único texto libre del editor, fuera de la ruta de carpeta) y
+  peso/alineación. Todo con botones/sliders. Un botón "duplicar" por capa
+  permite que la misma imagen/figura/texto entre dos veces al collage
+  como dos capas independientes (identificadas por `id`, no por ruta).
 - Parámetros globales que quedan en `ParamControls`: `layout.mode`, color
-  principal del lote, `recolor.mode`, semilla con "rehacer".
+  principal del lote, `recolor.mode`, semilla con "rehacer". Los ajustes
+  globales de `background` (auto/sólido/degradado + dirección + manchas)
+  y `finish` (viñeta, grano, desenfoque, contraste, brillo, saturación,
+  veladura, manchas) viven en `CanvasControls`, debajo de esos.
 - El mosaico tiene una compensación en `api/routes_render.py`
   (`_sin_explosion_de_mosaico`): el motor salta el resize automático al
   hueco del layout cuando hay `mosaic` sin `resize` propio, así que sin
@@ -158,14 +167,11 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   capa de decenas de miles de px. Ver el docstring ahí si vuelve a pasar
   algo raro con mosaico.
 
-Pendiente, deliberadamente fuera de esto:
-
-- Subida/almacenamiento real de imágenes (sigue siendo una carpeta local
-  en disco, no hay upload de archivos desde el navegador).
-- El resto del editor visual de specs: `crop`, `stain`, figuras (`shape`),
-  texto (`text`), y los ajustes globales de `background`/`finish`.
-- Todo lo de hosting multi-usuario (v3.0, no ahora): auth, storage que no
-  sea disco local, límites de cuota.
+Esta v2.0 local ya cubre todo el editor visual de specs. Movido a v3.0 (hosteada, no ahora): subida/almacenamiento real de imágenes
+(sigue siendo una carpeta local en disco por ahora, decidido a propósito:
+un upload de verdad implica una historia de storage que no tiene sentido
+resolver para una herramienta de un solo usuario en su propia máquina),
+auth, storage que no sea disco local, límites de cuota.
 
 ## docs/index.html: sitio de documentación (GitHub Pages)
 

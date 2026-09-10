@@ -10,14 +10,21 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
-class ImageLayer(BaseModel):
-    """Una imagen elegida a mano, con sus propios ajustes de capa.
+class LayerSpec(BaseModel):
+    """Una capa (imagen, figura o texto) con sus propios ajustes.
 
-    Las claves opcionales son las mismas que ya acepta una capa del motor
+    Exactamente una de `src`/`shape`/`text` identifica el tipo de capa,
+    igual que en el motor (`proun.spec._sources` lo valida). El resto de
+    las claves opcionales son las mismas que ya acepta una capa del motor
     (`proun.spec.LAYER_KEYS`); se mandan tal cual, sin reinterpretarlas acá.
     """
 
-    src: str
+    src: str | None = None
+    shape: str | dict | None = None
+    outline: dict | None = None
+    text: str | dict | None = None
+    crop: dict | None = None
+    stain: dict | None = None
     rotate: dict | None = None
     opacity: float | None = None
     blend: str | None = None
@@ -29,11 +36,13 @@ class ImageLayer(BaseModel):
 
 
 class PreviewRequest(BaseModel):
-    images: list[ImageLayer]
+    layers: list[LayerSpec]
     layout_mode: str = "scatter"
     color: str = "#3ba7ff"
     recolor_mode: str = "duotone"
     seed: int = 100_000
+    background: dict | str | None = None
+    finish: dict | None = None
 
 
 class ExportRequest(PreviewRequest):
