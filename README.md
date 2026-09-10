@@ -77,6 +77,21 @@ herramienta de escritorio que lee imágenes y escribe imágenes.
 
 Todas documentadas con `python main.py --help`.
 
+## GUI (v2.0, en desarrollo)
+
+Además de la CLI hay una interfaz gráfica local: eliges una carpeta de
+imágenes, ajustas layout, color, recoloreado y capas, ves una vista previa
+en vivo y exportas. Corre en tu máquina, sin cuentas ni nada hosteado.
+
+1. Backend: `pip install -r api/requirements.txt` y después
+   `uvicorn api.main:app --reload --port 8000`
+2. Frontend: `cd frontend && npm install && npm run dev`
+3. Abre `http://localhost:5173`
+
+Es un MVP: cubre los parámetros más comunes, no el editor visual completo de
+specs (`crop`, `mosaic`, `repeat`, `stain`, figuras, texto siguen siendo
+terreno de la CLI/JSON por ahora).
+
 ## Screenshots
 
 <p>

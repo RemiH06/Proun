@@ -1,0 +1,12 @@
+/* Mismos valores que docs/index.html: la GUI comparte identidad visual con
+   el sitio de documentación, no inventa una paleta aparte. */
+:root {
+  --paper: #f2efe8;
+  --paper-dim: #e8e3d6;
+  --ink: #141210;
+  --red: #d94f3d;
+  --grey: #6b6156;
+  --line: #cabfad;
+  --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --display: "Big Shoulders", sans-serif;
+}

@@ -117,32 +117,39 @@ docs/                       sitio de documentación (ver sección aparte)
 ## v2.0: interfaz gráfica en React
 
 Objetivo: convertir el motor de Python en un servicio con el que una
-webapp React pueda trabajar interactivamente (subir imágenes, ajustar
+webapp React pueda trabajar interactivamente (elegir imágenes, ajustar
 parámetros, ver previsualización, exportar), sin reescribir la lógica de
 generación. El motor Python sigue siendo la fuente de verdad.
 
-Piezas que probablemente hagan falta (a decidir/construir en Claude Code,
-no asumidas de antemano):
+Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
 
-- **Capa de API** sobre `proun/spec.py` + `proun/compose.py` (candidatos
-  razonables: FastAPI o Flask). Debe aceptar algo estructuralmente
-  equivalente a los JSON de `json/` y devolver la imagen generada o una
-  referencia a ella.
-- **Frontend React** para edición interactiva: parámetros de capa,
-  previsualización, y probablemente un editor visual de la especificación
-  en vez de JSON a mano.
-- Pensar temprano en **previsualización de bajo costo**: renderizar a
-  resolución completa en cada ajuste de parámetro va a ser lento; vale la
-  pena decidir una estrategia de preview (resolución reducida, debounce,
-  cache de la etapa `prepare()` reutilizada entre ediciones de color) antes
-  de construir mucho encima.
-- El manejo de `fuentes/` (el archivo de imágenes del usuario) necesita una
-  historia de subida/almacenamiento que hoy no existe: v1.0 asume que ya
-  están en disco.
+- `api/`: FastAPI sobre `proun/spec.py` + `proun/compose.py`. Cada ruta arma
+  el mismo tipo de dict que ya acepta `spec.build`, nada de validación
+  propia. `POST /api/preview` (baja resolución) y `POST /api/export`
+  (resolución real) comparten `_render()` en `api/routes_render.py`;
+  `api/cache.py` guarda la salida de `compose.prepare()` para no rehacer
+  geometría cuando solo cambia color o recoloreado (ver el comentario ahí
+  sobre por qué ese hash es distinto de `naming.content_hash`). Corre con
+  `uvicorn api.main:app --reload --port 8000`.
+- `frontend/`: React + Vite + TypeScript. El dev server (`npm run dev`)
+  llega a la API por proxy (`vite.config.ts`), no por CORS: es local, no
+  hace falta esa superficie. Paleta y tipografía son las mismas de
+  `docs/index.html` (`frontend/src/styles/tokens.css`), siguiendo el
+  criterio de la skill `site-launch-checklist` instalada en
+  `.claude/skills/`.
+- Alcance del MVP: elegir una carpeta local de `sources` (todavía no hay
+  subida de archivos, se sigue asumiendo que las imágenes ya están en
+  disco, como en v1.0), `layout.mode`, un color principal, `recolor.mode`,
+  cantidad de capas, semilla con "rehacer". No es el editor visual completo
+  de specs todavía (falta crop, mosaic, repeat, stain, shapes, text,
+  finish, capas múltiples con ajustes propios).
 
-No hay código de v2.0 todavía. Este documento es el punto de partida, no
-una arquitectura ya decidida: confirma con el usuario antes de comprometerte
-a FastAPI vs Flask, a dónde vive el almacenamiento de imágenes, etc.
+Pendiente, deliberadamente fuera de este MVP:
+
+- Subida/almacenamiento real de imágenes (sigue siendo una carpeta local).
+- Editor visual de specs completo.
+- Todo lo de hosting multi-usuario (v3.0, no ahora): auth, storage que no
+  sea disco local, límites de cuota.
 
 ## docs/index.html: sitio de documentación (GitHub Pages)
 

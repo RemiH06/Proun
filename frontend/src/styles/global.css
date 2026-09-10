@@ -1,0 +1,87 @@
+@font-face {
+  font-family: "Big Shoulders";
+  src: url("/fonts/BigShoulders-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Big Shoulders";
+  src: url("/fonts/BigShoulders-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+h1,
+h2,
+h3,
+label,
+button,
+select {
+  font-family: var(--display);
+}
+
+label {
+  font-weight: 700;
+}
+
+input,
+select,
+button {
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  padding: 0.4rem 0.6rem;
+}
+
+button {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+button.primary {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--paper);
+}
+
+button.primary:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+a {
+  color: var(--red);
+}
