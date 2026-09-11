@@ -143,7 +143,9 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   `api/cache.py` guarda la salida de `compose.prepare()` para no rehacer
   geometría cuando solo cambia color o recoloreado (ver el comentario ahí
   sobre por qué ese hash es distinto de `naming.content_hash`). Corre con
-  `uvicorn api.main:app --reload --port 8000`.
+  `uvicorn api.main:app --reload --port 8030` (puerto fijado a propósito,
+  no el 8000 default: varios proyectos de esta máquina ya lo usan, ver
+  `PORTS.md` en `48.SkillShot`).
 - `frontend/`: React + Vite + TypeScript. El dev server (`npm run dev`)
   llega a la API por proxy (`vite.config.ts`), no por CORS: es local, no
   hace falta esa superficie. Paleta y tipografía son las mismas de
@@ -237,9 +239,30 @@ React) vía CDN de jsdelivr como módulo ES. Efectos:
   abren dos puertas auxiliares chicas (arriba/abajo) al mismo tiempo que
   las puertas grandes se separan hacia los lados, todas sincronizadas para
   terminar juntas.
-- **Tabs** ("Lo que trae" / "Instalación" / "Cómo usarlo"): cambian con una
-  cortina (blades que se cierran, cambian el panel, se abren) y un
-  indicador rojo que se desliza suave hasta la tab activa.
+- **Tabs** ("Lo que trae" / "Instalación" / "Cómo usarlo" / "Mapa del
+  código"): cambian con una cortina (blades que se cierran, cambian el
+  panel, se abren) y un indicador rojo que se desliza suave hasta la tab
+  activa. El indicador es `position:absolute; bottom:0` del contenedor
+  `.tabs`, así que si las tabs envuelven a más de una fila queda pegado al
+  fondo de TODAS las filas, no de la fila de la tab activa (se ve
+  flotando, desconectado). Por eso en `max-width:640px` las tabs no
+  envuelven: la fila se vuelve de una sola línea con scroll horizontal
+  (`flex-wrap:nowrap` + `overflow-x:auto`). Si se agrega una quinta tab,
+  revisar que siga entrando cómoda en ese scroll, no hace falta tocar el
+  indicador.
+- **Mapa del código** (4ta tab): un `<iframe>` a `docs/ariadne/proun.html`,
+  el diagrama interactivo que genera la skill `ariadne` (`ariadne generate
+  . --out docs/ariadne --title "Proun" --formats html --theme light
+  --max-depth 2 --hide-generated`, corrido desde la raíz del repo).
+  `--max-depth 2` es a propósito: sin eso la vista inicial explota en los
+  ~1060 nodos de `tests/` (uno por clase/método) y tapa el resto del
+  árbol; con profundidad 2 arranca mostrando archivos, y de ahí se puede
+  expandir a mano. Ese HTML es generado, no se edita a mano, y hay que
+  volver a correr el comando (y commitear el archivo de nuevo) si la
+  estructura del proyecto cambia bastante; no hace falta por cada commit
+  chico. La UI del propio Ariadne (panel de filtros, colores) no sigue la
+  paleta constructivista del sitio a propósito: es una herramienta
+  embebida, no una sección de contenido del sitio.
 - **Galería**: las cuatro capturas se ensamblan con un solo momento de
   animación al entrar en pantalla, no una entrada genérica por sección.
 

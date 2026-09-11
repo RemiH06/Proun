@@ -84,9 +84,9 @@ imágenes, ajustas layout, color, recoloreado y capas, ves una vista previa
 en vivo y exportas. Corre en tu máquina, sin cuentas ni nada hosteado.
 
 1. Backend: `pip install -r api/requirements.txt` y después
-   `uvicorn api.main:app --reload --port 8000`
+   `uvicorn api.main:app --reload --port 8030`
 2. Frontend: `cd frontend && npm install && npm run dev`
-3. Abre `http://localhost:5173`
+3. Abre `http://localhost:5183`
 
 Es un MVP: cubre los parámetros más comunes, no el editor visual completo de
 specs (`crop`, `mosaic`, `repeat`, `stain`, figuras, texto siguen siendo

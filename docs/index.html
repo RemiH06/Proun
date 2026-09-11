@@ -370,6 +370,29 @@
     margin-right: 32px;
     color: var(--paper-dim);
     cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* En una fila que envuelve, el indicador (bottom:0 del contenedor) queda
+  pegado al final de TODAS las filas, no a la de la tab activa: si esa tab
+  cae en la primera fila, el indicador aparece flotando bien abajo, sin
+  relación visible con ella. Más angosto que esto ya no entran 3-4 tabs
+  sin envolver, así que en vez de pelear con eso la fila se vuelve
+  desplazable (una sola línea, scroll horizontal) y el indicador vuelve a
+  tener sentido siempre. */
+  @media (max-width: 640px) {
+    .tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding: 0 20px;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      flex: 0 0 auto;
+      margin-right: 24px;
+      font-size: 15px;
+    }
   }
 
   .tab:hover { color: var(--paper); }
@@ -401,10 +424,42 @@
     padding: 36px 40px;
   }
 
+  @media (max-width: 640px) {
+    .stage { padding: 28px 20px 0; }
+    .panel-dark { margin: 0 -20px; padding: 24px 20px; }
+  }
+
   .panel-intro {
     max-width: 42em;
     color: #d8d2c4;
     margin: 0 0 36px;
+  }
+
+  /* Como .panel-intro pero para un panel sobre el fondo claro del stage
+  (panel-usage es el único oscuro): el gris clarito de .panel-intro está
+  pensado para leerse sobre tinta, no sobre papel. */
+  .panel-lead {
+    max-width: 42em;
+    color: var(--grey);
+    margin: 0 0 24px;
+  }
+
+  .panel-lead a { color: var(--red); }
+
+  .graph-frame {
+    border: 1px solid var(--line);
+    height: 640px;
+  }
+
+  .graph-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+
+  @media (max-width: 640px) {
+    .graph-frame { height: 420px; }
   }
 
   .feature-list {
@@ -646,6 +701,7 @@
     <button class="tab" role="tab" id="tab-features" aria-controls="panel-features" aria-selected="true" data-index="0">Lo que trae</button>
     <button class="tab" role="tab" id="tab-install" aria-controls="panel-install" aria-selected="false" tabindex="-1" data-index="1">Instalación</button>
     <button class="tab" role="tab" id="tab-usage" aria-controls="panel-usage" aria-selected="false" tabindex="-1" data-index="2">Cómo usarlo</button>
+    <button class="tab" role="tab" id="tab-graph" aria-controls="panel-graph" aria-selected="false" tabindex="-1" data-index="3">Mapa del código</button>
     <div class="tab-indicator" aria-hidden="true"></div>
   </div>
 
@@ -733,6 +789,16 @@
           </div>
         </dl>
         <pre>python main.py --spec json/exp.json</pre>
+      </div>
+
+      <div class="panel" id="panel-graph" role="tabpanel" aria-labelledby="tab-graph" hidden>
+        <p class="panel-lead">Árbol de archivos, dependencias reales entre ellos, y clases/métodos del motor,
+          generado con <a href="https://github.com/RemiH06/Proun">Ariadne</a> directamente del código de este
+          repositorio. Arrastrá para moverte, girá la rueda para acercar, hacé clic en un nodo para ver su
+          detalle.</p>
+        <div class="graph-frame">
+          <iframe src="ariadne/proun.html" title="Mapa del código de Proun" loading="lazy"></iframe>
+        </div>
       </div>
   </div>
 </section>
