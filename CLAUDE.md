@@ -200,10 +200,10 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   frontend, el servidor responde 200, y el resultado sale igual que sin ese
   campo, sin ningún error visible. Si un cambio de comportamiento en `api/`
   o `proun/` no se nota al probar contra el `uvicorn` que ya estaba
-  corriendo, no asumas que el código está mal: primero confirmá el cambio
+  corriendo, no asumas que el código está mal: primero confirma el cambio
   con una llamada directa a `compose`/`spec` en Python (sin HTTP), y si eso
-  sí funciona, matá el proceso entero (`taskkill //PID <reloader> //F //T`,
-  el PID del *reloader*, no del worker) y arrancá `uvicorn` de nuevo antes
+  sí funciona, mata el proceso entero (`taskkill //PID <reloader> //F //T`,
+  el PID del *reloader*, no del worker) y arranca `uvicorn` de nuevo antes
   de seguir depurando.
 - El mosaico tiene una compensación en `api/routes_render.py`
   (`_sin_explosion_de_mosaico`): el motor salta el resize automático al
