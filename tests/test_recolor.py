@@ -112,6 +112,58 @@ class OtrosModos(unittest.TestCase):
             recolor.apply(grises(), ROJO, {"mode": "channels", "channels": {"r": [1, 2, 3]}})
 
 
+class Colormap(unittest.TestCase):
+    """El modo `colormap` no depende del color principal del lote: mapea el
+    tono a un degradado de varios colores con nombre (`name`, ver
+    recolor.COLORMAPS) o propio (`stops`)."""
+
+    def test_negro_da_el_primer_punto_del_degradado(self):
+        salida = recolor.apply(plana(0), ROJO, {"mode": "colormap", "name": "inferno"})
+        self.assertEqual(salida.getpixel((0, 0))[:3], recolor.COLORMAPS["inferno"][0])
+
+    def test_blanco_da_el_ultimo_punto_del_degradado(self):
+        salida = recolor.apply(plana(255), ROJO, {"mode": "colormap", "name": "inferno"})
+        self.assertEqual(salida.getpixel((0, 0))[:3], recolor.COLORMAPS["inferno"][-1])
+
+    def test_todos_los_degradados_con_nombre_funcionan_de_extremo_a_extremo(self):
+        for nombre, puntos in recolor.COLORMAPS.items():
+            with self.subTest(nombre=nombre):
+                negro = recolor.apply(plana(0), ROJO, {"mode": "colormap", "name": nombre})
+                blanco = recolor.apply(plana(255), ROJO, {"mode": "colormap", "name": nombre})
+                self.assertEqual(negro.getpixel((0, 0))[:3], puntos[0])
+                self.assertEqual(blanco.getpixel((0, 0))[:3], puntos[-1])
+
+    def test_es_el_degradado_por_defecto_si_no_se_da_name(self):
+        con_name = recolor.apply(grises(), ROJO, {"mode": "colormap", "name": "inferno"})
+        sin_name = recolor.apply(grises(), ROJO, {"mode": "colormap"})
+        self.assertEqual(con_name.tobytes(), sin_name.tobytes())
+
+    def test_no_depende_del_color_principal(self):
+        con_rojo = recolor.apply(grises(), ROJO, {"mode": "colormap"})
+        con_azul = recolor.apply(grises(), "#3ba7ff", {"mode": "colormap"})
+        self.assertEqual(con_rojo.tobytes(), con_azul.tobytes())
+
+    def test_nombre_desconocido(self):
+        with self.assertRaises(SpecError):
+            recolor.apply(grises(), ROJO, {"mode": "colormap", "name": "arcoiris"})
+
+    def test_stops_propios(self):
+        stops = {"mode": "colormap", "stops": ["#000000", "#ffffff"]}
+        negro = recolor.apply(plana(0), ROJO, stops).getpixel((0, 0))[:3]
+        blanco = recolor.apply(plana(255), ROJO, stops).getpixel((0, 0))[:3]
+        self.assertEqual(negro, (0, 0, 0))
+        self.assertEqual(blanco, (255, 255, 255))
+
+    def test_stops_le_gana_a_name(self):
+        stops = {"mode": "colormap", "name": "inferno", "stops": ["#000000", "#ffffff"]}
+        salida = recolor.apply(plana(255), ROJO, stops)
+        self.assertEqual(salida.getpixel((0, 0))[:3], (255, 255, 255))
+
+    def test_stops_necesita_al_menos_dos_colores(self):
+        with self.assertRaises(SpecError):
+            recolor.apply(grises(), ROJO, {"mode": "colormap", "stops": ["#000000"]})
+
+
 class Fuerza(unittest.TestCase):
     def test_mezcla_contra_los_tonos_por_defecto(self):
         # Con mix_with = "tones", bajar la fuerza acerca al gris de entrada,

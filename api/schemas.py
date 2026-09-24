@@ -66,3 +66,12 @@ class SourceListResponse(BaseModel):
     path: str
     count: int
     images: list[SourceImage]
+
+
+class RecolorRequest(BaseModel):
+    """Repinta un wallpaper YA exportado (`path`) con un colormap, sin
+    reconstruirlo desde sus capas: ver `recolorear.py`."""
+
+    path: str
+    name: str = "inferno"
+    stops: list[str] | None = None

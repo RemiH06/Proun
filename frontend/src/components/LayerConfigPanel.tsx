@@ -228,6 +228,14 @@ export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDup
           >
             auto
           </button>
+          <button
+            type="button"
+            className={c.resizeScale === 1 && c.resizeMode === 'fill' ? 'active' : ''}
+            onClick={() => onUpdate({ resizeScale: 1, resizeMode: 'fill', position: { x: 0.5, y: 0.5 } })}
+            title="cubre el lienzo entero de borde a borde, recorta lo que sobre y centra la capa"
+          >
+            llenar marco
+          </button>
         </div>
         <input
           type="range"
@@ -237,6 +245,29 @@ export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDup
           value={c.resizeScale ?? 0.4}
           onChange={(e) => onUpdate({ resizeScale: Number(e.target.value) })}
         />
+        {c.resizeScale !== null && (
+          <div className="sub-controls">
+            <span className="control-label">modo</span>
+            <div className="button-row">
+              <button
+                type="button"
+                className={c.resizeMode === 'fit' ? 'active' : ''}
+                onClick={() => onUpdate({ resizeMode: 'fit' })}
+                title="conserva la proporción, puede dejar espacio sin cubrir"
+              >
+                ajustar
+              </button>
+              <button
+                type="button"
+                className={c.resizeMode === 'fill' ? 'active' : ''}
+                onClick={() => onUpdate({ resizeMode: 'fill' })}
+                title="recorta lo que sobre para no dejar espacio sin cubrir"
+              >
+                llenar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="control-group">

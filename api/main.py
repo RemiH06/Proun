@@ -13,11 +13,12 @@ from proun import layout
 from proun.errors import SpecError
 from proun.ops import blend, recolor, shapes
 
-from . import routes_render, routes_sources
+from . import routes_recolor, routes_render, routes_sources
 
 app = FastAPI(title="Proun API")
 app.include_router(routes_sources.router, prefix="/api")
 app.include_router(routes_render.router, prefix="/api")
+app.include_router(routes_recolor.router, prefix="/api")
 
 
 @app.get("/api/options")
@@ -30,6 +31,7 @@ def options() -> dict:
         "recolor_modes": list(recolor.MODES),
         "blend_modes": list(blend.MODES),
         "shape_kinds": list(shapes.KINDS),
+        "colormaps": list(recolor.COLORMAPS),
     }
 
 

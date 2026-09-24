@@ -7,11 +7,15 @@ import { ExportButton } from './components/ExportButton'
 import { LayerConfigList } from './components/LayerConfigList'
 import { ParamControls } from './components/ParamControls'
 import { PreviewPane } from './components/PreviewPane'
+import { RecolorView } from './components/RecolorView'
 import { SourceFolderPicker } from './components/SourceFolderPicker'
 import { useDebouncedValue } from './hooks/useDebouncedValue'
 import { useSpecState } from './hooks/useSpecState'
 
+type Vista = 'editor' | 'recolorear'
+
 export default function App() {
+  const [vista, setVista] = useState<Vista>('editor')
   const {
     state,
     update,
@@ -82,38 +86,58 @@ export default function App() {
         <img src="/favicon.svg" alt="" className="masthead-mark" />
         <h1>Proun</h1>
         <p className="muted">generador de wallpapers tipo collage</p>
+        <div className="view-switch">
+          <button
+            type="button"
+            className={vista === 'editor' ? 'active' : ''}
+            onClick={() => setVista('editor')}
+          >
+            editor
+          </button>
+          <button
+            type="button"
+            className={vista === 'recolorear' ? 'active' : ''}
+            onClick={() => setVista('recolorear')}
+          >
+            recolorear
+          </button>
+        </div>
       </header>
-      <main className="layout">
-        <div className="column">
-          <SourceFolderPicker
-            value={folderPath}
-            onChange={setFolderPath}
-            selectedPaths={selectedPaths}
-            onToggle={toggleImage}
+      {vista === 'editor' ? (
+        <main className="layout">
+          <div className="column">
+            <SourceFolderPicker
+              value={folderPath}
+              onChange={setFolderPath}
+              selectedPaths={selectedPaths}
+              onToggle={toggleImage}
+            />
+            <AddLayerButtons onAddShape={addShape} onAddText={addText} />
+            <ParamControls state={state} options={options} onUpdate={update} onReroll={reroll} />
+            <CanvasControls
+              resolution={state.resolution}
+              background={state.background}
+              finish={state.finish}
+              onResolutionChange={(resolution) => update('resolution', resolution)}
+              onUpdateBackground={updateBackground}
+              onUpdateFinish={updateFinish}
+            />
+            <ExportButton params={state} disabled={state.layers.length === 0} />
+          </div>
+          <LayerConfigList
+            layers={state.layers}
+            options={options}
+            onUpdate={updateLayer}
+            onRemove={removeLayer}
+            onDuplicate={duplicateLayer}
           />
-          <AddLayerButtons onAddShape={addShape} onAddText={addText} />
-          <ParamControls state={state} options={options} onUpdate={update} onReroll={reroll} />
-          <CanvasControls
-            resolution={state.resolution}
-            background={state.background}
-            finish={state.finish}
-            onResolutionChange={(resolution) => update('resolution', resolution)}
-            onUpdateBackground={updateBackground}
-            onUpdateFinish={updateFinish}
-          />
-          <ExportButton params={state} disabled={state.layers.length === 0} />
-        </div>
-        <LayerConfigList
-          layers={state.layers}
-          options={options}
-          onUpdate={updateLayer}
-          onRemove={removeLayer}
-          onDuplicate={duplicateLayer}
-        />
-        <div className="column">
-          <PreviewPane imageUrl={imageUrl} loading={loading} error={error} />
-        </div>
-      </main>
+          <div className="column">
+            <PreviewPane imageUrl={imageUrl} loading={loading} error={error} />
+          </div>
+        </main>
+      ) : (
+        <RecolorView />
+      )}
     </div>
   )
 }

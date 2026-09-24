@@ -10,6 +10,8 @@ Modos:
     screen    aclara hacia el color, útil sobre fondos oscuros
     hue       impone el matiz, conserva saturación y luminosidad
     channels  ganancia y desplazamiento explícitos por canal r, g, b
+    colormap  degradado de varios colores (`name`, ver COLORMAPS, o una
+              lista propia en `stops`), no depende del color principal
     none      deja la capa tal cual
 
 `strength` mezcla el resultado con una referencia, y `mix_with` dice cuál:
@@ -27,13 +29,50 @@ from PIL import Image, ImageChops, ImageEnhance, ImageOps
 from .. import colors
 from ..errors import SpecError
 
-MODES = ("duotone", "tint", "screen", "hue", "channels", "none")
+MODES = ("duotone", "tint", "screen", "hue", "channels", "colormap", "none")
 
 MIX_SOURCES = ("tones", "source")
 
 KEYS = {
     "mode", "strength", "mix_with", "color", "shadow", "highlight",
-    "midpoint", "levels", "saturation", "channels",
+    "midpoint", "levels", "saturation", "channels", "name", "stops",
+}
+
+# Degradados con nombre para el modo "colormap". Puntos de control de la
+# familia perceptualmente uniforme de matplotlib (la misma que trae ArcGIS
+# Pro de fábrica para datos continuos), aproximados a mano: no son los 256
+# valores oficiales, pero alcanzan para que se reconozcan a simple vista.
+COLORMAPS = {
+    "inferno": (
+        (0, 0, 4), (31, 12, 72), (85, 15, 109), (136, 34, 106),
+        (186, 54, 85), (227, 89, 51), (249, 140, 10), (249, 201, 50),
+        (252, 255, 164),
+    ),
+    "viridis": (
+        (68, 1, 84), (72, 40, 120), (62, 74, 137), (49, 104, 142),
+        (38, 130, 142), (31, 158, 137), (53, 183, 121), (109, 205, 89),
+        (180, 222, 44), (253, 231, 37),
+    ),
+    "plasma": (
+        (13, 8, 135), (75, 3, 161), (125, 3, 168), (168, 34, 150),
+        (203, 70, 121), (229, 107, 93), (248, 148, 65), (253, 195, 40),
+        (240, 249, 33),
+    ),
+    "magma": (
+        (0, 0, 4), (28, 16, 68), (79, 18, 123), (129, 37, 129),
+        (181, 54, 122), (229, 80, 100), (251, 135, 97), (254, 194, 135),
+        (252, 253, 191),
+    ),
+    "cividis": (
+        (0, 32, 76), (0, 42, 102), (48, 63, 111), (89, 84, 116),
+        (127, 106, 120), (165, 128, 116), (206, 152, 100), (255, 178, 60),
+        (255, 234, 70),
+    ),
+    "turbo": (
+        (48, 18, 59), (65, 69, 171), (52, 130, 222), (30, 184, 210),
+        (65, 219, 150), (146, 235, 88), (220, 216, 59), (253, 165, 49),
+        (227, 89, 38), (159, 34, 27), (122, 4, 3),
+    ),
 }
 
 
@@ -57,6 +96,8 @@ def apply(im: Image.Image, main, spec=None, source: Image.Image | None = None) -
 
     if mode == "duotone":
         out = _duotone(ImageOps.grayscale(base), main, spec)
+    elif mode == "colormap":
+        out = _colormap(ImageOps.grayscale(base), spec)
     elif mode == "tint":
         out = ImageChops.multiply(base, Image.new("RGB", base.size, main))
     elif mode == "screen":
@@ -108,6 +149,40 @@ def _duotone(gray: Image.Image, main, spec) -> Image.Image:
         gray, black=shadow, white=highlight, mid=main,
         blackpoint=black, whitepoint=white, midpoint=mid,
     )
+
+
+def _colormap(gray: Image.Image, spec) -> Image.Image:
+    """Mapea el tono (0 negro, 255 blanco) a un degradado de varios colores,
+    en vez de a los dos extremos de un duotono. `stops` gana si viene junto
+    con `name`."""
+    raw = spec.get("stops")
+    if raw is not None:
+        if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+            raise SpecError("recolor.stops necesita una lista de al menos dos colores")
+        puntos = tuple(colors.parse(c) for c in raw)
+    else:
+        name = str(spec.get("name", "inferno")).lower()
+        if name not in COLORMAPS:
+            raise SpecError(f"recolor.name debe ser uno de {sorted(COLORMAPS)}, llegó {name!r}")
+        puntos = COLORMAPS[name]
+    lut_r, lut_g, lut_b = _gradient_luts(puntos)
+    r, g, b = (gray.point(lut) for lut in (lut_r, lut_g, lut_b))
+    return Image.merge("RGB", (r, g, b))
+
+
+def _gradient_luts(puntos: tuple[tuple[int, int, int], ...]):
+    """Tres tablas de 256 entradas (una por canal), interpolando en línea
+    recta entre los colores de control repartidos parejo en 0..255."""
+    tramos = len(puntos) - 1
+    salida = ([], [], [])
+    for i in range(256):
+        avance = i / 255 * tramos
+        tramo = min(int(avance), tramos - 1)
+        resto = avance - tramo
+        inicio, fin = puntos[tramo], puntos[tramo + 1]
+        for canal in range(3):
+            salida[canal].append(round(inicio[canal] + (fin[canal] - inicio[canal]) * resto))
+    return salida
 
 
 def _hue(base: Image.Image, main, spec) -> Image.Image:

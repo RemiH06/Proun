@@ -9,6 +9,7 @@ export type Options = {
   recolor_modes: string[]
   blend_modes: string[]
   shape_kinds: string[]
+  colormaps: string[]
 }
 
 export type FlipMode = 'none' | 'horizontal' | 'vertical' | 'both'
@@ -56,6 +57,10 @@ type CommonLayer = {
   // que ya usa el layout para su propio sorteo de tamaño, solo que fijado a
   // mano en vez de aleatorio.
   resizeScale: number | null
+  // "fit" conserva la proporción y puede dejar franjas del hueco sin
+  // cubrir; "fill" recorta el sobrante para llenarlo por completo, sin
+  // dejar espacios. Solo importa mientras resizeScale no sea null.
+  resizeMode: 'fit' | 'fill'
   // 0 = sin manchar.
   stainAmount: number
   // Mismo acabado que el global (viñeta, grano, desenfoque...), pero
@@ -98,6 +103,7 @@ function commonDefaults(): CommonLayer {
     z: 0,
     cropAspect: null,
     resizeScale: null,
+    resizeMode: 'fit',
     stainAmount: 0,
     finish: defaultFinish(),
   }
@@ -164,7 +170,13 @@ export function toLayerDict(cfg: LayerConfig): Record<string, unknown> {
   if (cfg.z !== 0) layer.z = cfg.z
   if (cfg.cropAspect) layer.crop = { aspect: cfg.cropAspect }
   if (cfg.resizeScale !== null) {
-    layer.resize = { size: [cfg.resizeScale, cfg.resizeScale], mode: 'fit' }
+    // JSON no distingue 1 de 1.0: un valor entero exacto viajaría como
+    // "size": [1, 1] y el motor lee ese 1 como 1 PIXEL, no 100% del
+    // lienzo (proun/geometry.py::measure trata int = px, float =
+    // fracción). "llenar marco" manda justo ese 1, así que hay que
+    // empujarlo un poquito para que siempre viaje con parte decimal.
+    const valor = Number.isInteger(cfg.resizeScale) ? cfg.resizeScale + 0.0001 : cfg.resizeScale
+    layer.resize = { size: [valor, valor], mode: cfg.resizeMode }
   }
   if (cfg.stainAmount > 0) layer.stain = { amount: cfg.stainAmount }
   const finishDict = toFinishDict(cfg.finish)
@@ -338,6 +350,41 @@ export async function exportImage(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(toBody(params)),
+  })
+  if (!res.ok) throw new Error(await readError(res))
+  const blob = await res.blob()
+  return { blob, path: res.headers.get('X-Export-Path') }
+}
+
+// Repinta un wallpaper YA exportado (por ruta) con un colormap, sin pasar
+// por layers/compose: ver api/routes_recolor.py y recolorear.py.
+export type RecolorParams = {
+  path: string
+  name: string
+  stops?: string[]
+}
+
+function recolorBody(p: RecolorParams) {
+  return p.stops ? { path: p.path, stops: p.stops } : { path: p.path, name: p.name }
+}
+
+export async function recolorPreview(params: RecolorParams): Promise<Blob> {
+  const res = await fetch('/api/recolor/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recolorBody(params)),
+  })
+  if (!res.ok) throw new Error(await readError(res))
+  return res.blob()
+}
+
+export async function recolorExport(
+  params: RecolorParams,
+): Promise<{ blob: Blob; path: string | null }> {
+  const res = await fetch('/api/recolor/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recolorBody(params)),
   })
   if (!res.ok) throw new Error(await readError(res))
   const blob = await res.blob()

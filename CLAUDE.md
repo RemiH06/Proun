@@ -43,6 +43,9 @@ main.py                    punto de entrada CLI, CONFIG editable
 diagnosticar.py            mide % de píxeles oscuros por archivo real,
                             con las dos polaridades (light/dark)
 inspeccionar.py            lista fuentes con tamaño y proporción
+recolorear.py              repinta un wallpaper YA exportado con un
+                            colormap (recolor.py, modo "colormap"), sin
+                            reconstruirlo desde sus capas originales
 requirements.txt           solo Pillow
 
 recetas/                   configuraciones Python de ejemplo
@@ -126,6 +129,26 @@ docs/                       sitio de documentación (ver sección aparte)
   revisar si también ensucia el alfa fuera del contenido real antes de
   darlo por seguro para uso por capa (probalo como
   `tests/test_compose.py::AcabadoPorCapa` lo hace con vignette/grain).
+- **`recolor.mode = "colormap"`**: a diferencia de duotone/tint/screen/hue
+  (todos derivados de un color principal), mapea el tono a un degradado de
+  varios colores con nombre (`name`, ver `recolor.COLORMAPS`: inferno,
+  viridis, plasma, magma, cividis, turbo, la familia perceptualmente
+  uniforme de matplotlib/ArcGIS Pro) o propio (`stops`, una lista de
+  colores). No usa `main` para nada; sirve tanto para componer de cero
+  como para volver a colorear un wallpaper YA exportado (`recolorear.py`
+  y la pestaña "recolorear" del GUI, ver más abajo), porque solo le
+  importa el brillo de cada píxel, no de dónde salió.
+- **`geometry.measure()` distingue fracción de píxeles por el tipo de
+  Python, no por el valor**: `0.5` (float) es "mitad del lienzo", pero
+  `1` (int) es "1 píxel", aunque numéricamente ambos podrían representar
+  "el 100%". JSON no tiene esa distinción (`1` y `1.0` se serializan
+  igual), así que cualquier control del GUI que mande una fracción del
+  lienzo como número (como el tamaño manual por capa) tiene que evitar
+  mandar un valor entero exacto, o el motor lo va a leer como píxeles
+  absolutos. `frontend/src/api/client.ts::toLayerDict` ya tiene el
+  parche para `resize.size` (le suma un épsilon si el valor es un entero);
+  cualquier control nuevo que mande otra fracción numérica necesita el
+  mismo cuidado.
 
 ## v2.0: interfaz gráfica en React
 
@@ -162,7 +185,11 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   medio, scrolleable): rotar/voltear, opacidad, modo de fusión, color
   propio, tamaño manual (`resize.size` como fracción del lienzo, botón
   "auto" vuelve al tamaño que sortea el layout, mismo mecanismo que ya usa
-  `layout.sizes()` internamente), recorte por proporción (`crop.aspect`,
+  `layout.sizes()` internamente; botón "llenar marco" pone escala 1 +
+  modo "llenar" + posición centrada, para que una capa cubra el lienzo
+  entero sin dejar huecos; el modo "ajustar"/"llenar" alterna entre
+  `resize.mode` "fit" (conserva proporción, puede dejar espacio) y "fill"
+  (recorta el sobrante, sin espacio)), recorte por proporción (`crop.aspect`,
   botones libre/1:1/4:3/3:4/16:9/9:16), manchas propias (`stain`), acabado
   propio (`finish`:
   viñeta, grano, desenfoque, contraste, brillo, saturación, veladura,
@@ -211,6 +238,16 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   esto una foto real (miles de px) más una grilla de 3x3 terminaba en una
   capa de decenas de miles de px. Ver el docstring ahí si vuelve a pasar
   algo raro con mosaico.
+- **Segunda pestaña, "recolorear"** (`App.tsx`, switch `vista` en el
+  masthead, `.view-switch`): no compone nada nuevo, repinta un wallpaper
+  YA exportado con un colormap. `WallpaperPicker` es como
+  `SourceFolderPicker` pero de selección única (mira `wallpapers/` por
+  default, no `fuentes/`), sin tocar ese componente para no mezclarle
+  semántica de selección múltiple. `api/routes_recolor.py`
+  (`/api/recolor/preview` y `/api/recolor/export`) reusa
+  `recolorear.recolorear` tal cual, la misma función que el script de
+  línea de comandos: la GUI y la CLI comparten la lógica entera, ninguna
+  reimplementa nada de la otra.
 
 Esta v2.0 local ya cubre todo el editor visual de specs. Movido a v3.0 (hosteada, no ahora): subida/almacenamiento real de imágenes
 (sigue siendo una carpeta local en disco por ahora, decidido a propósito:

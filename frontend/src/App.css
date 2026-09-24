@@ -26,6 +26,24 @@
   border: 1px solid var(--line);
 }
 
+.view-switch {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.view-switch button {
+  padding: 0.4rem 0.9rem;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.view-switch button.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
 .layout {
   flex: 1;
   min-height: 0;
@@ -33,8 +51,16 @@
   grid-template-columns: minmax(260px, 300px) minmax(300px, 380px) 1fr;
 }
 
+.layout-2col {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+}
+
 @media (max-width: 1000px) {
-  .layout {
+  .layout,
+  .layout-2col {
     grid-template-columns: 1fr;
     height: auto;
     overflow: visible;

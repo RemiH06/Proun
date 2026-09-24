@@ -26,6 +26,7 @@ client = TestClient(app)
 
 
 GRANDE = FUENTES / "grande.png"
+WALLPAPER = FUENTES / "wallpaper.png"
 
 
 def setUpModule():
@@ -35,6 +36,9 @@ def setUpModule():
     # Simula una foto real (miles de px), el caso donde el mosaico se
     # disparaba: ver Mosaico más abajo.
     Image.new("RGB", (3000, 2000), (80, 40, 20)).save(GRANDE)
+    # Simula un wallpaper ya exportado (duotono en el canal azul), el caso
+    # que cubre Recolor más abajo.
+    Image.linear_gradient("L").resize((64, 64)).convert("RGB").save(WALLPAPER)
 
 
 def tearDownModule():
@@ -83,6 +87,7 @@ class Opciones(unittest.TestCase):
         self.assertEqual(datos["recolor_modes"], list(recolor.MODES))
         self.assertEqual(datos["blend_modes"], list(blend.MODES))
         self.assertEqual(datos["shape_kinds"], list(shapes.KINDS))
+        self.assertEqual(datos["colormaps"], list(recolor.COLORMAPS))
 
 
 class Fuentes(unittest.TestCase):
@@ -356,6 +361,56 @@ class Export(unittest.TestCase):
         destino = Path(resp.headers["x-export-path"])
         self.assertTrue(destino.is_file())
         self.assertTrue(destino.is_relative_to(salida))
+
+
+class Recolor(unittest.TestCase):
+    """Repinta un wallpaper YA exportado (WALLPAPER), sin pasar por
+    layers/compose: ver api/routes_recolor.py y recolorear.py."""
+
+    def test_preview_usa_inferno_por_defecto(self):
+        con_name = client.post("/api/recolor/preview",
+                               json={"path": str(WALLPAPER), "name": "inferno"})
+        sin_name = client.post("/api/recolor/preview", json={"path": str(WALLPAPER)})
+        self.assertEqual(sin_name.status_code, 200)
+        self.assertEqual(con_name.content, sin_name.content)
+
+    def test_preview_respeta_el_name(self):
+        inferno = client.post("/api/recolor/preview",
+                              json={"path": str(WALLPAPER), "name": "inferno"})
+        viridis = client.post("/api/recolor/preview",
+                              json={"path": str(WALLPAPER), "name": "viridis"})
+        self.assertEqual(viridis.status_code, 200)
+        self.assertNotEqual(inferno.content, viridis.content)
+
+    def test_preview_respeta_stops_propios(self):
+        resp = client.post("/api/recolor/preview", json={
+            "path": str(WALLPAPER), "stops": ["#000000", "#ffffff"],
+        })
+        otro = client.post("/api/recolor/preview", json={
+            "path": str(WALLPAPER), "stops": ["#3ba7ff", "#d94f3d"],
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotEqual(resp.content, otro.content)
+
+    def test_preview_archivo_inexistente_da_400_en_espanol(self):
+        resp = client.post("/api/recolor/preview",
+                           json={"path": str(FUENTES / "no_existe.png")})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("no existe", resp.json()["detail"])
+
+    def test_preview_name_invalido_da_400(self):
+        resp = client.post("/api/recolor/preview",
+                           json={"path": str(WALLPAPER), "name": "arcoiris"})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_export_guarda_junto_al_original_con_sufijo(self):
+        origen = RAIZ / "propio.png"
+        Image.linear_gradient("L").resize((32, 32)).convert("RGB").save(origen)
+        resp = client.post("/api/recolor/export", json={"path": str(origen)})
+        self.assertEqual(resp.status_code, 200)
+        destino = Path(resp.headers["x-export-path"])
+        self.assertEqual(destino, origen.with_stem("propio_inferno"))
+        self.assertTrue(destino.is_file())
 
 
 if __name__ == "__main__":
