@@ -16,6 +16,7 @@ from api.paths import PROJECT_ROOT, resolve_sources_path
 from api.routes_render import _build_spec, _sin_explosion_de_mosaico
 from api.schemas import LayerSpec, PreviewRequest
 from proun import compose, layout, loading
+from proun import spec as spec_module
 from proun.ops import blend, recolor, shapes
 
 RAIZ = Path(tempfile.mkdtemp(prefix="proun-api-"))
@@ -361,6 +362,43 @@ class Export(unittest.TestCase):
         destino = Path(resp.headers["x-export-path"])
         self.assertTrue(destino.is_file())
         self.assertTrue(destino.is_relative_to(salida))
+
+
+class Spec(unittest.TestCase):
+    """La spec del GUI actual como JSON, para reconstruir el wallpaper fuera
+    del GUI o volver a importarla después: ver api/routes_render.py::_spec_dict."""
+
+    def test_forma_del_dict(self):
+        resp = client.post("/api/spec", json=cuerpo(resolution="800x600"))
+        self.assertEqual(resp.status_code, 200)
+        datos = resp.json()
+        self.assertEqual(datos["resolutions"], ["800x600"])
+        self.assertEqual(datos["colors"], ["#3ba7ff"])
+        self.assertEqual(datos["seeds"], [424242])
+        self.assertEqual(datos["layout"], {"mode": "scatter"})
+        self.assertEqual(datos["defaults"], {"recolor": {"mode": "duotone"}})
+        self.assertEqual(len(datos["sources"]), len(ARCHIVOS))
+
+    def test_lo_que_devuelve_lo_puede_reconstruir_spec_build(self):
+        # La prueba real de "sirve para reconstruir": el propio motor tiene
+        # que poder volver a leerla, igual que --spec en la CLI.
+        resp = client.post("/api/spec", json=cuerpo(layers=capas({"z": 3})))
+        datos = resp.json()
+        reconstruida = spec_module.build(datos)
+        self.assertEqual(reconstruida.sources[0].z, 3)
+
+    def test_capas_de_figura_y_texto_tambien_se_reconstruyen(self):
+        resp = client.post("/api/spec", json=cuerpo(
+            layers=[{"shape": "circle"}, {"text": "PROUN"}],
+        ))
+        datos = resp.json()
+        reconstruida = spec_module.build(datos)
+        self.assertEqual(len(reconstruida.sources), 2)
+
+    def test_sin_capas_da_400_en_espanol(self):
+        resp = client.post("/api/spec", json=cuerpo(layers=[]))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("imagen", resp.json()["detail"])
 
 
 class Recolor(unittest.TestCase):

@@ -103,6 +103,12 @@ export function useSpecState() {
     setState((s) => ({ ...s, finish: { ...s.finish, ...patch } }))
   }
 
+  // Reemplaza el estado entero: lo usa la importación de un JSON de spec
+  // (parseSpecJson), donde no tiene sentido ir campo por campo.
+  function loadState(nuevo: SpecState) {
+    setState(nuevo)
+  }
+
   return {
     state,
     update,
@@ -115,5 +121,6 @@ export function useSpecState() {
     duplicateLayer,
     updateBackground,
     updateFinish,
+    loadState,
   }
 }

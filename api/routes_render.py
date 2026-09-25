@@ -49,14 +49,18 @@ def _sin_explosion_de_mosaico(capa: dict, lado_mayor: int) -> dict:
     return {**capa, "resize": {"max_side": max(1, round(lado_mayor / factor))}}
 
 
-def _build_spec(body: PreviewRequest, resolution: str, fmt: str = "png",
-                output: str = "wallpapers"):
+def _spec_dict(body: PreviewRequest, resolution: str, fmt: str = "png",
+               output: str = "wallpapers") -> dict:
+    """El dict tal cual lo espera `spec.build` (y la CLI vía `--spec`), sin
+    normalizar: separado de `_build_spec` para poder devolvérselo al
+    frontend como JSON editable/reconstruible (`/api/spec`), no solo para
+    armar la `Spec` ya resuelta que necesita `compose`."""
     lado_mayor = max(spec_module.parse_resolutions([resolution])[0])
     sources = [
         _sin_explosion_de_mosaico(capa.model_dump(exclude_none=True), lado_mayor)
         for capa in body.layers
     ]
-    data = {
+    return {
         "sources": sources,
         "resolutions": [resolution],
         "colors": [body.color],
@@ -68,7 +72,11 @@ def _build_spec(body: PreviewRequest, resolution: str, fmt: str = "png",
         "format": fmt,
         "output": output,
     }
-    return spec_module.build(data)
+
+
+def _build_spec(body: PreviewRequest, resolution: str, fmt: str = "png",
+                output: str = "wallpapers"):
+    return spec_module.build(_spec_dict(body, resolution, fmt, output))
 
 
 def _render(body: PreviewRequest, resolution: str, fmt: str = "png", output: str = "wallpapers"):
@@ -91,6 +99,19 @@ def preview(body: PreviewRequest) -> Response:
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return Response(content=buffer.getvalue(), media_type="image/png")
+
+
+@router.post("/spec")
+def spec_as_json(body: ExportRequest) -> dict:
+    """La spec actual del GUI, tal cual la entendería la CLI con `--spec`:
+    para reconstruir el wallpaper actual fuera del GUI, o para guardarlo y
+    volver a importarlo después. Valida con `spec.build` (tira SpecError,
+    400 en español, si algo no cierra) pero devuelve el dict de antes de
+    normalizar, no la Spec ya resuelta: ese es el que tiene sentido a mano
+    o para reimportar."""
+    data = _spec_dict(body, body.resolution, body.format, body.output)
+    spec_module.build(data)
+    return data
 
 
 @router.post("/export")

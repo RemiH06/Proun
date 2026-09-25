@@ -9,6 +9,7 @@ import { ParamControls } from './components/ParamControls'
 import { PreviewPane } from './components/PreviewPane'
 import { RecolorView } from './components/RecolorView'
 import { SourceFolderPicker } from './components/SourceFolderPicker'
+import { SpecIO } from './components/SpecIO'
 import { useDebouncedValue } from './hooks/useDebouncedValue'
 import { useSpecState } from './hooks/useSpecState'
 
@@ -28,6 +29,7 @@ export default function App() {
     duplicateLayer,
     updateBackground,
     updateFinish,
+    loadState,
   } = useSpecState()
   const [folderPath, setFolderPath] = useState('')
   const [options, setOptions] = useState<Options | null>(null)
@@ -123,6 +125,7 @@ export default function App() {
               onUpdateFinish={updateFinish}
             />
             <ExportButton params={state} disabled={state.layers.length === 0} />
+            <SpecIO state={state} disabled={state.layers.length === 0} onImport={loadState} />
           </div>
           <LayerConfigList
             layers={state.layers}

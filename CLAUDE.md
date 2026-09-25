@@ -90,7 +90,7 @@ proun/
                         __init__.py debe quedar VACÍO (imports ahí generan
                         falsos circulares en Windows)
 
-tests/                     572 pruebas, unittest estándar
+tests/                     876 pruebas, unittest estándar
 fuentes/                    archivo personal de imágenes del usuario, NO
                              se versiona
 docs/                       sitio de documentación (ver sección aparte)
@@ -249,6 +249,25 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   línea de comandos: la GUI y la CLI comparten la lógica entera, ninguna
   reimplementa nada de la otra.
 
+- **JSON: exportar/importar la spec desde el propio GUI** (`SpecIO.tsx`,
+  columna izquierda del editor, debajo de `ExportButton`): `POST /api/spec`
+  (`api/routes_render.py::spec_as_json`) devuelve el mismo dict que ya arma
+  `_spec_dict` para preview/export (antes de `spec.build` normalizarlo), o
+  sea el formato exacto que acepta la CLI con `--spec`; valida con
+  `spec.build` antes de devolverlo, así que un spec inválido da 400 en vez
+  de un archivo roto. "exportar json" descarga ese dict como archivo
+  (`proun_<seed>.json`). "importar json" lee un archivo elegido, lo
+  parsea con `client.ts::parseSpecJson` (el camino inverso de `toBody`/
+  `toLayerDict`) y reemplaza el estado entero del editor con
+  `useSpecState::loadState`. Este camino de vuelta es necesariamente con
+  pérdida: la spec completa del motor admite cosas que el editor no tiene
+  control para mostrar (capas `pool`, `cover`, `region`/`bleed`,
+  `resize.scale`/`max_side`, o varias resoluciones/colores/semillas a la
+  vez en un solo spec). Donde pasa eso, `parseSpecJson` no falla ni
+  descarta en silencio: hace lo mejor posible (por ejemplo, usa la primera
+  resolución/color/semilla de una lista) y junta un `warnings: string[]`
+  que `SpecIO` muestra en pantalla, para que quede claro qué se aproximó o
+  se omitió al importar un JSON escrito a mano o generado por la CLI.
 Esta v2.0 local ya cubre todo el editor visual de specs. Movido a v3.0 (hosteada, no ahora): subida/almacenamiento real de imágenes
 (sigue siendo una carpeta local en disco por ahora, decidido a propósito:
 un upload de verdad implica una historia de storage que no tiene sentido
