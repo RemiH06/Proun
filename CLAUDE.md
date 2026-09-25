@@ -90,7 +90,7 @@ proun/
                         __init__.py debe quedar VACÍO (imports ahí generan
                         falsos circulares en Windows)
 
-tests/                     876 pruebas, unittest estándar
+tests/                     884 pruebas, unittest estándar
 fuentes/                    archivo personal de imágenes del usuario, NO
                              se versiona
 docs/                       sitio de documentación (ver sección aparte)
@@ -138,6 +138,11 @@ docs/                       sitio de documentación (ver sección aparte)
   como para volver a colorear un wallpaper YA exportado (`recolorear.py`
   y la pestaña "recolorear" del GUI, ver más abajo), porque solo le
   importa el brillo de cada píxel, no de dónde salió.
+- **`recolor.mode = "invert"`**: negativo fotográfico llano
+  (`PIL.ImageOps.invert`, 255 menos cada canal), tampoco usa `main`.
+  Reusa toda la infraestructura de alfa/`strength`/`saturation` que ya
+  tiene `recolor.apply` en vez de resolverlo aparte: por eso vive como un
+  modo más ahí y no como una función suelta.
 - **`geometry.measure()` distingue fracción de píxeles por el tipo de
   Python, no por el valor**: `0.5` (float) es "mitad del lienzo", pero
   `1` (int) es "1 píxel", aunque numéricamente ambos podrían representar
@@ -240,14 +245,18 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   algo raro con mosaico.
 - **Segunda pestaña, "recolorear"** (`App.tsx`, switch `vista` en el
   masthead, `.view-switch`): no compone nada nuevo, repinta un wallpaper
-  YA exportado con un colormap. `WallpaperPicker` es como
-  `SourceFolderPicker` pero de selección única (mira `wallpapers/` por
-  default, no `fuentes/`), sin tocar ese componente para no mezclarle
-  semántica de selección múltiple. `api/routes_recolor.py`
-  (`/api/recolor/preview` y `/api/recolor/export`) reusa
-  `recolorear.recolorear` tal cual, la misma función que el script de
-  línea de comandos: la GUI y la CLI comparten la lógica entera, ninguna
-  reimplementa nada de la otra.
+  YA exportado con un colormap o como negativo (`recolor.mode`
+  "colormap"/"invert"). `WallpaperPicker` es como `SourceFolderPicker`
+  pero de selección única (mira `wallpapers/` por default, no
+  `fuentes/`), sin tocar ese componente para no mezclarle semántica de
+  selección múltiple. `RecolorView.tsx` junta ambos modos en un mismo
+  `button-row` (los colormaps de `options.colormaps` más un botón
+  "negativo" al final); elegir un colormap pone `mode: 'colormap'`,
+  "negativo" pone `mode: 'invert'`, mutuamente excluyentes.
+  `api/routes_recolor.py` (`/api/recolor/preview` y `/api/recolor/export`)
+  reusa `recolorear.recolorear` tal cual, la misma función que el script
+  de línea de comandos (`recolorear.py foto.png --invert`): la GUI y la
+  CLI comparten la lógica entera, ninguna reimplementa nada de la otra.
 
 - **JSON: exportar/importar la spec desde el propio GUI** (`SpecIO.tsx`,
   columna izquierda del editor, debajo de `ExportButton`): `POST /api/spec`

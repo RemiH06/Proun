@@ -24,7 +24,7 @@ router = APIRouter()
 def _repintar(body: RecolorRequest) -> Image.Image:
     ruta = resolve_sources_path(body.path)
     imagen = loading.load(ruta)
-    return recolorear.recolorear(imagen, name=body.name, stops=body.stops)
+    return recolorear.recolorear(imagen, mode=body.mode, name=body.name, stops=body.stops)
 
 
 @router.post("/recolor/preview")
@@ -39,7 +39,7 @@ def preview(body: RecolorRequest) -> Response:
 def export(body: RecolorRequest) -> Response:
     imagen = _repintar(body)
     origen = Path(resolve_sources_path(body.path))
-    sufijo = "personalizado" if body.stops else body.name
+    sufijo = "invertido" if body.mode == "invert" else ("personalizado" if body.stops else body.name)
     destino = origen.with_stem(f"{origen.stem}_{sufijo}")
     imagen.convert("RGB").save(destino)
     return Response(

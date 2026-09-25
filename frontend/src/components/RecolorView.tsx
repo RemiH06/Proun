@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchOptions, recolorExport, recolorPreview, type Options } from '../api/client'
+import { fetchOptions, recolorExport, recolorPreview, type Options, type RecolorMode } from '../api/client'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { PreviewPane } from './PreviewPane'
 import { WallpaperPicker } from './WallpaperPicker'
@@ -12,6 +12,7 @@ export function RecolorView() {
   const [options, setOptions] = useState<Options | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [name, setName] = useState('inferno')
+  const [mode, setMode] = useState<RecolorMode>('colormap')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +29,7 @@ export function RecolorView() {
       })
   }, [])
 
-  const debounced = useDebouncedValue({ selected, name }, 300)
+  const debounced = useDebouncedValue({ selected, mode, name }, 300)
 
   useEffect(() => {
     if (!debounced.selected) {
@@ -38,7 +39,7 @@ export function RecolorView() {
     let vigente = true
     setLoading(true)
     setError(null)
-    recolorPreview({ path: debounced.selected, name: debounced.name })
+    recolorPreview({ path: debounced.selected, mode: debounced.mode, name: debounced.name })
       .then((blob) => {
         if (!vigente) return
         const url = URL.createObjectURL(blob)
@@ -64,7 +65,7 @@ export function RecolorView() {
     setBusy(true)
     setStatus(null)
     try {
-      const { path } = await recolorExport({ path: selected, name })
+      const { path } = await recolorExport({ path: selected, mode, name })
       setStatus(path ? `guardado en ${path}` : 'exportado')
     } catch (e) {
       setStatus(e instanceof Error ? e.message : 'no se pudo exportar')
@@ -92,12 +93,22 @@ export function RecolorView() {
               <button
                 key={m}
                 type="button"
-                className={name === m ? 'active' : ''}
-                onClick={() => setName(m)}
+                className={mode === 'colormap' && name === m ? 'active' : ''}
+                onClick={() => {
+                  setMode('colormap')
+                  setName(m)
+                }}
               >
                 {m}
               </button>
             ))}
+            <button
+              type="button"
+              className={mode === 'invert' ? 'active' : ''}
+              onClick={() => setMode('invert')}
+            >
+              negativo
+            </button>
           </div>
         </section>
 

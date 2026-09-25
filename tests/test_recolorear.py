@@ -62,6 +62,16 @@ class Recolorear(unittest.TestCase):
         otra = recolorear.recolorear(duotono_azul())
         self.assertEqual(una.convert("RGB").tobytes(), otra.convert("RGB").tobytes())
 
+    def test_mode_invert_da_el_negativo(self):
+        salida = recolorear.recolorear(duotono_azul(), mode="invert")
+        esperado = recolor.apply(duotono_azul().convert("RGBA"), "#000000", {"mode": "invert"})
+        self.assertEqual(salida.convert("RGB").tobytes(), esperado.convert("RGB").tobytes())
+
+    def test_mode_invert_ignora_name_y_stops(self):
+        con_name = recolorear.recolorear(duotono_azul(), mode="invert", name="viridis")
+        sin_name = recolorear.recolorear(duotono_azul(), mode="invert")
+        self.assertEqual(con_name.convert("RGB").tobytes(), sin_name.convert("RGB").tobytes())
+
 
 class CLI(unittest.TestCase):
     def test_guarda_con_sufijo_por_defecto(self):
@@ -86,6 +96,13 @@ class CLI(unittest.TestCase):
         codigo = recolorear.main([str(origen), "--stops", "#000000", "#ffffff"])
         self.assertEqual(codigo, 0)
         self.assertTrue((RAIZ / "custom_personalizado.png").is_file())
+
+    def test_invert_da_sufijo_invertido(self):
+        origen = RAIZ / "negativo.png"
+        duotono_azul(32, 32).save(origen)
+        codigo = recolorear.main([str(origen), "--invert"])
+        self.assertEqual(codigo, 0)
+        self.assertTrue((RAIZ / "negativo_invertido.png").is_file())
 
     def test_archivo_inexistente(self):
         codigo = recolorear.main([str(RAIZ / "no_existe.png")])

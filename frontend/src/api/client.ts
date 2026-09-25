@@ -357,15 +357,20 @@ export async function exportImage(
   return { blob, path: res.headers.get('X-Export-Path') }
 }
 
-// Repinta un wallpaper YA exportado (por ruta) con un colormap, sin pasar
-// por layers/compose: ver api/routes_recolor.py y recolorear.py.
+// Repinta un wallpaper YA exportado (por ruta) con un colormap o como
+// negativo, sin pasar por layers/compose: ver api/routes_recolor.py y
+// recolorear.py.
+export type RecolorMode = 'colormap' | 'invert'
+
 export type RecolorParams = {
   path: string
+  mode?: RecolorMode
   name: string
   stops?: string[]
 }
 
 function recolorBody(p: RecolorParams) {
+  if (p.mode === 'invert') return { path: p.path, mode: 'invert' }
   return p.stops ? { path: p.path, stops: p.stops } : { path: p.path, name: p.name }
 }
 

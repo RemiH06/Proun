@@ -450,6 +450,22 @@ class Recolor(unittest.TestCase):
         self.assertEqual(destino, origen.with_stem("propio_inferno"))
         self.assertTrue(destino.is_file())
 
+    def test_preview_mode_invert_da_el_negativo(self):
+        colormap = client.post("/api/recolor/preview", json={"path": str(WALLPAPER)})
+        invertido = client.post("/api/recolor/preview",
+                                json={"path": str(WALLPAPER), "mode": "invert"})
+        self.assertEqual(invertido.status_code, 200)
+        self.assertNotEqual(colormap.content, invertido.content)
+
+    def test_export_invert_da_sufijo_invertido(self):
+        origen = RAIZ / "negativo.png"
+        Image.linear_gradient("L").resize((32, 32)).convert("RGB").save(origen)
+        resp = client.post("/api/recolor/export", json={"path": str(origen), "mode": "invert"})
+        self.assertEqual(resp.status_code, 200)
+        destino = Path(resp.headers["x-export-path"])
+        self.assertEqual(destino, origen.with_stem("negativo_invertido"))
+        self.assertTrue(destino.is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

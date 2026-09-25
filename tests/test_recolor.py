@@ -164,6 +164,27 @@ class Colormap(unittest.TestCase):
             recolor.apply(grises(), ROJO, {"mode": "colormap", "stops": ["#000000"]})
 
 
+class Invertir(unittest.TestCase):
+    """El modo `invert` es un negativo fotográfico llano: 255 menos cada
+    canal, sin pasar por el color principal."""
+
+    def test_invierte_cada_canal(self):
+        color = Image.new("RGBA", (8, 8), (30, 90, 200, 255))
+        r, g, b = recolor.apply(color, ROJO, {"mode": "invert"}).getpixel((0, 0))[:3]
+        self.assertEqual((r, g, b), (225, 165, 55))
+
+    def test_no_depende_del_color_principal(self):
+        con_rojo = recolor.apply(grises(), ROJO, {"mode": "invert"})
+        con_azul = recolor.apply(grises(), "#3ba7ff", {"mode": "invert"})
+        self.assertEqual(con_rojo.tobytes(), con_azul.tobytes())
+
+    def test_dos_veces_da_la_original(self):
+        original = grises()
+        ida_y_vuelta = recolor.apply(recolor.apply(original, ROJO, {"mode": "invert"}), ROJO,
+                                     {"mode": "invert"})
+        self.assertEqual(ida_y_vuelta.convert("RGB").tobytes(), original.convert("RGB").tobytes())
+
+
 class Fuerza(unittest.TestCase):
     def test_mezcla_contra_los_tonos_por_defecto(self):
         # Con mix_with = "tones", bajar la fuerza acerca al gris de entrada,

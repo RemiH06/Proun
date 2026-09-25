@@ -12,6 +12,8 @@ Modos:
     channels  ganancia y desplazamiento explícitos por canal r, g, b
     colormap  degradado de varios colores (`name`, ver COLORMAPS, o una
               lista propia en `stops`), no depende del color principal
+    invert    negativo fotográfico (255 menos cada canal), no depende del
+              color principal
     none      deja la capa tal cual
 
 `strength` mezcla el resultado con una referencia, y `mix_with` dice cuál:
@@ -29,7 +31,7 @@ from PIL import Image, ImageChops, ImageEnhance, ImageOps
 from .. import colors
 from ..errors import SpecError
 
-MODES = ("duotone", "tint", "screen", "hue", "channels", "colormap", "none")
+MODES = ("duotone", "tint", "screen", "hue", "channels", "colormap", "invert", "none")
 
 MIX_SOURCES = ("tones", "source")
 
@@ -104,6 +106,8 @@ def apply(im: Image.Image, main, spec=None, source: Image.Image | None = None) -
         out = ImageChops.screen(base, Image.new("RGB", base.size, main))
     elif mode == "hue":
         out = _hue(base, main, spec)
+    elif mode == "invert":
+        out = ImageOps.invert(base)
     else:
         out = _channels(base, spec)
 

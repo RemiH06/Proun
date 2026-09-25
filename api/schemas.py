@@ -69,9 +69,11 @@ class SourceListResponse(BaseModel):
 
 
 class RecolorRequest(BaseModel):
-    """Repinta un wallpaper YA exportado (`path`) con un colormap, sin
-    reconstruirlo desde sus capas: ver `recolorear.py`."""
+    """Repinta un wallpaper YA exportado (`path`) con un colormap o como
+    negativo (`mode`), sin reconstruirlo desde sus capas: ver
+    `recolorear.py`."""
 
     path: str
+    mode: str = "colormap"
     name: str = "inferno"
     stops: list[str] | None = None
