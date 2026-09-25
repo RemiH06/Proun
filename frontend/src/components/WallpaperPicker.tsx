@@ -8,6 +8,21 @@ type Props = {
   onSelect: (path: string) => void
 }
 
+// Los sufijos que ya usan api/routes_recolor.py y recolorear.py para las
+// variantes recoloreadas de un wallpaper (mismo nombre de carpeta que la
+// imagen principal, ver CLAUDE.md): se filtran acá para no listarlas como
+// si fueran wallpapers propios, uno por variante.
+const SUFIJOS_RECOLOREADO = [
+  'inferno', 'viridis', 'plasma', 'magma', 'cividis', 'turbo', 'invertido',
+]
+
+function esVarianteRecoloreada(img: SourceImage): boolean {
+  const partes = img.path.split(/[\\/]/)
+  const carpeta = partes[partes.length - 2]
+  const stem = img.name.replace(/\.[^.]+$/, '')
+  return SUFIJOS_RECOLOREADO.some((sufijo) => stem === `${carpeta}_${sufijo}`)
+}
+
 // Como SourceFolderPicker, pero de selección única: acá no se arma una lista
 // de capas para componer, se elige UN wallpaper ya exportado para volver a
 // colorearlo.
@@ -24,7 +39,7 @@ export function WallpaperPicker({ value, onChange, selected, onSelect }: Props) 
     try {
       const resultado = await listSources(draft)
       onChange(draft)
-      setImages(resultado.images)
+      setImages(resultado.images.filter((img) => !esVarianteRecoloreada(img)))
       setResolvedPath(resultado.path)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'no se pudo leer la carpeta')

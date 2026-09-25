@@ -7,6 +7,7 @@ type Props = {
 }
 
 export function ExportButton({ params, disabled }: Props) {
+  const [name, setName] = useState('')
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -14,7 +15,7 @@ export function ExportButton({ params, disabled }: Props) {
     setBusy(true)
     setStatus(null)
     try {
-      const { path } = await exportImage(params)
+      const { path } = await exportImage({ ...params, name: name.trim() || undefined })
       setStatus(path ? `guardado en ${path}` : 'exportado')
     } catch (e) {
       setStatus(e instanceof Error ? e.message : 'no se pudo exportar')
@@ -27,6 +28,15 @@ export function ExportButton({ params, disabled }: Props) {
     <section className="panel">
       <h2>Exportar</h2>
       <p className="muted">{params.resolution}</p>
+      <div className="control-group">
+        <span className="control-label">Nombre (opcional)</span>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="mi_wallpaper"
+        />
+      </div>
       <button className="primary" onClick={exportar} disabled={disabled || busy}>
         {busy ? 'exportando...' : 'exportar'}
       </button>

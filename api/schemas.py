@@ -55,6 +55,10 @@ class PreviewRequest(BaseModel):
 class ExportRequest(PreviewRequest):
     format: str = "png"
     output: str = "wallpapers"
+    # Nombre del wallpaper: si viene vacío, api/routes_render.py arma uno
+    # tipo wp_<color>_<semilla>. Da nombre a su carpeta y a sus archivos
+    # (imagen, spec, recoloreados) dentro de wallpapers/<resolución>/.
+    name: str | None = None
 
 
 class SourceImage(BaseModel):
@@ -68,7 +72,19 @@ class SourceListResponse(BaseModel):
     images: list[SourceImage]
 
 
-class RecolorRequest(BaseModel):
+class RecolorGeometry(BaseModel):
+    """Ajustes de geometría opcionales antes de recolorear: rotar/voltear
+    (múltiplos de 90, como en una capa del editor) y encajar en otra
+    resolución (recorta el sobrante, no deforma). Los comparten preview,
+    export y export-all."""
+
+    angle: int = 0
+    flip_h: bool = False
+    flip_v: bool = False
+    resolution: str | None = None
+
+
+class RecolorRequest(RecolorGeometry):
     """Repinta un wallpaper YA exportado (`path`) con un colormap o como
     negativo (`mode`), sin reconstruirlo desde sus capas: ver
     `recolorear.py`."""
@@ -77,3 +93,11 @@ class RecolorRequest(BaseModel):
     mode: str = "colormap"
     name: str = "inferno"
     stops: list[str] | None = None
+
+
+class RecolorAllRequest(RecolorGeometry):
+    """Genera todas las variantes (los colormaps con nombre más el
+    negativo) de un wallpaper YA exportado y las guarda junto al
+    original, en su misma carpeta."""
+
+    path: str

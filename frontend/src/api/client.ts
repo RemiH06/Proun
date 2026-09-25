@@ -272,6 +272,10 @@ export const RESOLUTIONS: Array<{ label: string; value: string; group: Resolutio
   { label: '1080x1920 (celular)', value: '1080x1920', group: 'celular' },
   { label: '1170x2532 (iPhone)', value: '1170x2532', group: 'celular' },
   { label: '1290x2796 (iPhone Pro Max)', value: '1290x2796', group: 'celular' },
+  { label: '1080x2400 (Nothing Phone 1)', value: '1080x2400', group: 'celular' },
+  { label: '1080x2412 (Nothing Phone 2 / 2a)', value: '1080x2412', group: 'celular' },
+  { label: '1080x2392 (Nothing Phone 3a / 3a Pro)', value: '1080x2392', group: 'celular' },
+  { label: '1260x2800 (Nothing Phone 3)', value: '1260x2800', group: 'celular' },
 ]
 
 export const DEFAULT_RESOLUTION = '1920x1080'
@@ -287,7 +291,10 @@ export type PreviewParams = {
   resolution: string
 }
 
-export type ExportParams = PreviewParams
+// El nombre da su carpeta y sus archivos dentro de wallpapers/<resolución>/
+// (imagen, spec, recoloreados): ver api/routes_render.py::_wallpaper_paths.
+// Vacío u omitido, el backend arma uno con el color y la semilla.
+export type ExportParams = PreviewParams & { name?: string }
 
 export const SEED_MIN = 100_000
 export const SEED_MAX = 999_999_999
@@ -350,7 +357,7 @@ export async function exportImage(
   const res = await fetch('/api/export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(toBody(params)),
+    body: JSON.stringify({ ...toBody(params), name: params.name }),
   })
   if (!res.ok) throw new Error(await readError(res))
   const blob = await res.blob()
@@ -359,7 +366,8 @@ export async function exportImage(
 
 // Repinta un wallpaper YA exportado (por ruta) con un colormap o como
 // negativo, sin pasar por layers/compose: ver api/routes_recolor.py y
-// recolorear.py.
+// recolorear.py. angle/flipH/flipV/resolution son opcionales: rotan/
+// voltean y encajan en otra resolución antes de recolorear.
 export type RecolorMode = 'colormap' | 'invert'
 
 export type RecolorParams = {
@@ -367,11 +375,22 @@ export type RecolorParams = {
   mode?: RecolorMode
   name: string
   stops?: string[]
+  angle?: 0 | 90 | 180 | 270
+  flipH?: boolean
+  flipV?: boolean
+  resolution?: string | null
 }
 
 function recolorBody(p: RecolorParams) {
-  if (p.mode === 'invert') return { path: p.path, mode: 'invert' }
-  return p.stops ? { path: p.path, stops: p.stops } : { path: p.path, name: p.name }
+  const geometria: Record<string, unknown> = {
+    path: p.path,
+    angle: p.angle ?? 0,
+    flip_h: p.flipH ?? false,
+    flip_v: p.flipV ?? false,
+  }
+  if (p.resolution) geometria.resolution = p.resolution
+  if (p.mode === 'invert') return { ...geometria, mode: 'invert' }
+  return p.stops ? { ...geometria, stops: p.stops } : { ...geometria, name: p.name }
 }
 
 export async function recolorPreview(params: RecolorParams): Promise<Blob> {
@@ -395,6 +414,35 @@ export async function recolorExport(
   if (!res.ok) throw new Error(await readError(res))
   const blob = await res.blob()
   return { blob, path: res.headers.get('X-Export-Path') }
+}
+
+// Genera los colormaps con nombre más el negativo de una sola vez y los
+// guarda junto al original, en su misma carpeta (sin comprimir en zip: ver
+// api/routes_recolor.py::export_all).
+export type RecolorAllParams = {
+  path: string
+  angle?: 0 | 90 | 180 | 270
+  flipH?: boolean
+  flipV?: boolean
+  resolution?: string | null
+}
+
+export async function recolorExportAll(
+  params: RecolorAllParams,
+): Promise<{ folder: string; paths: string[] }> {
+  const res = await fetch('/api/recolor/export-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path: params.path,
+      angle: params.angle ?? 0,
+      flip_h: params.flipH ?? false,
+      flip_v: params.flipV ?? false,
+      ...(params.resolution ? { resolution: params.resolution } : {}),
+    }),
+  })
+  if (!res.ok) throw new Error(await readError(res))
+  return res.json()
 }
 
 // La spec actual, tal cual la entendería la CLI con --spec: para guardarla

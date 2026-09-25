@@ -7,6 +7,8 @@ solo arman el dict que `spec.build` acepta y devuelven la imagen resultante.
 from __future__ import annotations
 
 import io
+import json
+import re
 
 from fastapi import APIRouter
 from fastapi.responses import Response
@@ -114,13 +116,38 @@ def spec_as_json(body: ExportRequest) -> dict:
     return data
 
 
+def _slug(nombre: str) -> str:
+    """Nombre de carpeta/archivo seguro a partir del que escribió el
+    usuario: minúsculas, todo lo que no sea letra o número se vuelve guión
+    bajo, tope de 60 caracteres."""
+    limpio = re.sub(r"[^a-z0-9]+", "_", nombre.strip().lower()).strip("_")
+    return limpio[:60]
+
+
+def _wallpaper_paths(body: ExportRequest, built) -> tuple:
+    """Carpeta dedicada a este wallpaper dentro de wallpapers/<resolución>/
+    (una por export desde el GUI, ver CLAUDE.md) y el nombre base de sus
+    archivos adentro: el que puso el usuario, saneado, o
+    wp_<color>_<semilla> si lo dejó vacío. Exportar dos veces con el mismo
+    nombre pisa esa carpeta a propósito, es la misma composición vuelta a
+    guardar."""
+    base = _slug(body.name) if body.name else ""
+    if not base:
+        base = f"wp_{colors.to_hex(built.colors[0])}_{built.seeds[0]}"
+    carpeta = naming.resolution_dir(built.output, built.resolutions[0]) / base
+    return carpeta, base
+
+
 @router.post("/export")
 def export(body: ExportRequest) -> Response:
     built, image = _render(body, body.resolution, body.format, body.output)
-    color_hex = colors.to_hex(built.colors[0])
-    name = naming.filename(1, color_hex, built.seeds[0], built.fmt, naming.content_hash(built))
-    path = naming.resolution_dir(built.output, built.resolutions[0]) / name
+    carpeta, base = _wallpaper_paths(body, built)
+    path = carpeta / f"{base}.{built.fmt}"
     compose.save(image, path, built.fmt, built.quality, built.optimize)
+    spec_data = _spec_dict(body, body.resolution, body.format, body.output)
+    (carpeta / f"{base}.json").write_text(
+        json.dumps(spec_data, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return Response(
         content=path.read_bytes(),
         media_type=_MEDIA_TYPES[built.fmt],

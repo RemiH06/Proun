@@ -90,7 +90,7 @@ proun/
                         __init__.py debe quedar VACÍO (imports ahí generan
                         falsos circulares en Windows)
 
-tests/                     884 pruebas, unittest estándar
+tests/                     895 pruebas, unittest estándar
 fuentes/                    archivo personal de imágenes del usuario, NO
                              se versiona
 docs/                       sitio de documentación (ver sección aparte)
@@ -277,6 +277,42 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   resolución/color/semilla de una lista) y junta un `warnings: string[]`
   que `SpecIO` muestra en pantalla, para que quede claro qué se aproximó o
   se omitió al importar un JSON escrito a mano o generado por la CLI.
+- **Cada export del GUI arma su propia carpeta** dentro de
+  `wallpapers/<resolución>/` (`api/routes_render.py::_wallpaper_paths`,
+  solo para este flujo, el batch del CLI con `recetas/`/`main.py` sigue
+  igual que siempre, con su numeración plana): adentro va la imagen
+  (`<nombre>.png`), el mismo JSON que devuelve `/api/spec`
+  (`<nombre>.json`) y, si se recolorea desde la pestaña "recolorear",
+  todas sus variantes (`<nombre>_inferno.png`, `<nombre>_invertido.png`,
+  etc.), porque quedan en la carpeta de la imagen que las originó. El
+  nombre sale de un campo "Nombre (opcional)" en `ExportButton.tsx`:
+  vacío, usa `wp_<color>_<semilla>` como antes; con texto, se sanea
+  (minúsculas, símbolos a guión bajo, tope 60 caracteres). Exportar dos
+  veces con el mismo nombre pisa esa carpeta a propósito, es la misma
+  composición vuelta a guardar, no un duplicado.
+- **`WallpaperPicker` filtra las variantes recoloreadas** para no
+  listarlas como si fueran wallpapers propios: un archivo cuyo nombre es
+  `<carpeta>_<sufijo>` (sufijo = un colormap o "invertido") se esconde,
+  solo se ofrece `<carpeta>.<ext>`, la imagen principal. Wallpapers
+  viejos de antes de esta carpeta por wallpaper (sueltos directo en
+  `wallpapers/<resolución>/`) no matchean ese patrón y se siguen viendo
+  igual que siempre, sin migración.
+- **La pestaña "recolorear" también rota/voltea/redimensiona**, además de
+  elegir colormap o negativo: controles "Rotar" (0/90/180/270, igual que
+  `LayerConfigPanel`) y "Voltear" (↔/↕) aplican `proun.ops.rotate` antes
+  de recolorear; "Redimensionar" (la lista de `RESOLUTIONS`, con
+  "tamaño original" como default) aplica `proun.ops.resize` en modo
+  "fill" (encaja y recorta el sobrante, no deforma) después de rotar,
+  para que primero se corrija la orientación y después se encaje a la
+  resolución de destino. Todo vive en `api/routes_recolor.py::_preparar`,
+  compartido por preview, export y export-all. `RESOLUTIONS` en
+  `client.ts` suma pantallas de Nothing Phone (1, 2/2a, 3a/3a Pro, 3)
+  junto a las de iPhone que ya había.
+- **Botón "descargar todas las variantes"** (`/api/recolor/export-all`):
+  genera los colormaps con nombre más el negativo de una sola vez y los
+  guarda sin comprimir junto al original, en su misma carpeta, en vez de
+  exportarlos uno por uno a mano. No arma un zip, ver `RecolorAllRequest`
+  en `api/schemas.py`.
 Esta v2.0 local ya cubre todo el editor visual de specs. Movido a v3.0 (hosteada, no ahora): subida/almacenamiento real de imágenes
 (sigue siendo una carpeta local en disco por ahora, decidido a propósito:
 un upload de verdad implica una historia de storage que no tiene sentido

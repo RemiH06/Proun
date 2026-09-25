@@ -1,6 +1,7 @@
 """Pruebas de la API FastAPI (api/) que envuelve proun.spec/proun.compose."""
 
 import io
+import json
 import shutil
 import tempfile
 import unittest
@@ -349,6 +350,10 @@ class Errores(unittest.TestCase):
 
 
 class Export(unittest.TestCase):
+    """Cada export desde el GUI arma su propia carpeta dentro de
+    wallpapers/<resolución>/, con la imagen y su spec adentro: ver
+    api/routes_render.py::_wallpaper_paths."""
+
     def test_da_una_imagen_real_en_la_resolucion_pedida(self):
         # output apunta dentro de RAIZ (que tearDownModule ya limpia) para no
         # escribir en el wallpapers/ real del repo al correr los tests.
@@ -362,6 +367,48 @@ class Export(unittest.TestCase):
         destino = Path(resp.headers["x-export-path"])
         self.assertTrue(destino.is_file())
         self.assertTrue(destino.is_relative_to(salida))
+
+    def test_sin_nombre_usa_color_y_semilla(self):
+        salida = RAIZ / "sin_nombre"
+        resp = client.post("/api/export", json=cuerpo(
+            resolution="320x200", output=str(salida), seed=999999,
+        ))
+        destino = Path(resp.headers["x-export-path"])
+        self.assertEqual(destino.parent.name, "wp_3ba7ff_999999")
+        self.assertEqual(destino.name, "wp_3ba7ff_999999.png")
+
+    def test_la_carpeta_lleva_tambien_el_json_de_la_spec(self):
+        salida = RAIZ / "con_json"
+        resp = client.post("/api/export", json=cuerpo(resolution="320x200", output=str(salida)))
+        destino = Path(resp.headers["x-export-path"])
+        json_path = destino.with_suffix(".json")
+        self.assertTrue(json_path.is_file())
+        guardado = json.loads(json_path.read_text(encoding="utf-8"))
+        self.assertEqual(guardado["resolutions"], ["320x200"])
+
+    def test_nombre_propio_sanea_la_carpeta(self):
+        salida = RAIZ / "con_nombre"
+        resp = client.post("/api/export", json=cuerpo(
+            resolution="320x200", output=str(salida), name="¡Atardecer Rojo!",
+        ))
+        destino = Path(resp.headers["x-export-path"])
+        self.assertEqual(destino.parent.name, "atardecer_rojo")
+        self.assertEqual(destino.name, "atardecer_rojo.png")
+
+    def test_exportar_dos_veces_con_el_mismo_nombre_pisa_la_carpeta(self):
+        salida = RAIZ / "repetido"
+        primero = client.post("/api/export", json=cuerpo(
+            resolution="320x200", output=str(salida), name="mismo",
+        ))
+        segundo = client.post("/api/export", json=cuerpo(
+            resolution="320x200", output=str(salida), name="mismo", color="#d94f3d",
+        ))
+        self.assertEqual(
+            Path(primero.headers["x-export-path"]).parent,
+            Path(segundo.headers["x-export-path"]).parent,
+        )
+        carpeta = Path(segundo.headers["x-export-path"]).parent
+        self.assertEqual(len(list(carpeta.iterdir())), 2)  # imagen + json, no acumula
 
 
 class Spec(unittest.TestCase):
@@ -465,6 +512,64 @@ class Recolor(unittest.TestCase):
         destino = Path(resp.headers["x-export-path"])
         self.assertEqual(destino, origen.with_stem("negativo_invertido"))
         self.assertTrue(destino.is_file())
+
+    def test_preview_angle_90_cambia_el_tamano(self):
+        # Un rectángulo (no cuadrado) delata el giro: ancho y alto se cruzan.
+        rectangular = RAIZ / "rectangular.png"
+        Image.linear_gradient("L").resize((90, 60)).convert("RGB").save(rectangular)
+        resp = client.post("/api/recolor/preview",
+                           json={"path": str(rectangular), "angle": 90})
+        imagen = Image.open(io.BytesIO(resp.content))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(imagen.size, (60, 90))
+
+    def test_preview_angle_invalido_da_400(self):
+        resp = client.post("/api/recolor/preview", json={"path": str(WALLPAPER), "angle": 45})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_preview_flip_cambia_el_resultado(self):
+        # WALLPAPER es un degradado de arriba a abajo (uniforme en cada
+        # fila): voltear horizontal no cambiaría nada, voltear vertical sí.
+        sin_voltear = client.post("/api/recolor/preview", json={"path": str(WALLPAPER)})
+        volteada = client.post("/api/recolor/preview",
+                               json={"path": str(WALLPAPER), "flip_v": True})
+        self.assertNotEqual(sin_voltear.content, volteada.content)
+
+    def test_preview_resolution_encaja_al_tamano_pedido(self):
+        resp = client.post("/api/recolor/preview",
+                           json={"path": str(WALLPAPER), "resolution": "40x40"})
+        imagen = Image.open(io.BytesIO(resp.content))
+        self.assertEqual(imagen.size, (40, 40))
+
+    def test_preview_resolution_invalida_da_400(self):
+        resp = client.post("/api/recolor/preview",
+                           json={"path": str(WALLPAPER), "resolution": "no_valido"})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_export_all_guarda_todas_las_variantes_junto_al_original(self):
+        origen = RAIZ / "todas.png"
+        Image.linear_gradient("L").resize((32, 32)).convert("RGB").save(origen)
+        resp = client.post("/api/recolor/export-all", json={"path": str(origen)})
+        self.assertEqual(resp.status_code, 200)
+        datos = resp.json()
+        self.assertEqual(datos["folder"], str(origen.parent))
+        self.assertEqual(len(datos["paths"]), len(recolor.COLORMAPS) + 1)
+        for ruta in datos["paths"]:
+            self.assertTrue(Path(ruta).is_file())
+        nombres = {Path(ruta).stem for ruta in datos["paths"]}
+        self.assertIn("todas_inferno", nombres)
+        self.assertIn("todas_invertido", nombres)
+
+    def test_export_all_respeta_rotar_y_redimensionar(self):
+        origen = RAIZ / "todas_geo.png"
+        Image.linear_gradient("L").resize((32, 32)).convert("RGB").save(origen)
+        resp = client.post("/api/recolor/export-all", json={
+            "path": str(origen), "angle": 90, "resolution": "50x60",
+        })
+        self.assertEqual(resp.status_code, 200)
+        for ruta in resp.json()["paths"]:
+            with Image.open(ruta) as im:
+                self.assertEqual(im.size, (50, 60))
 
 
 if __name__ == "__main__":
