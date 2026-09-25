@@ -290,13 +290,15 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   (minúsculas, símbolos a guión bajo, tope 60 caracteres). Exportar dos
   veces con el mismo nombre pisa esa carpeta a propósito, es la misma
   composición vuelta a guardar, no un duplicado.
-- **`WallpaperPicker` filtra las variantes recoloreadas** para no
-  listarlas como si fueran wallpapers propios: un archivo cuyo nombre es
-  `<carpeta>_<sufijo>` (sufijo = un colormap o "invertido") se esconde,
-  solo se ofrece `<carpeta>.<ext>`, la imagen principal. Wallpapers
-  viejos de antes de esta carpeta por wallpaper (sueltos directo en
-  `wallpapers/<resolución>/`) no matchean ese patrón y se siguen viendo
-  igual que siempre, sin migración.
+- **`WallpaperPicker` lista todo lo que haya en la carpeta, sin filtrar**:
+  la imagen principal y sus variantes recoloreadas aparecen todas como
+  miniaturas elegibles, a propósito. Se probó esconder las variantes
+  (detectando `<carpeta>_<sufijo>` por nombre) para que la lista no se
+  llenara de una entrada por colormap, pero eso bloqueaba un caso de uso
+  real: recolorear una variante YA recoloreada (por ejemplo, invertir una
+  que ya está en inferno). `recolor.apply` no le importa de dónde salió
+  el píxel, solo su brillo, así que cualquier archivo de la carpeta es un
+  punto de partida válido.
 - **La pestaña "recolorear" también rota/voltea/redimensiona**, además de
   elegir colormap o negativo: controles "Rotar" (0/90/180/270, igual que
   `LayerConfigPanel`) y "Voltear" (↔/↕) aplican `proun.ops.rotate` antes
