@@ -136,6 +136,14 @@ export function RecolorView() {
         <section className="panel">
           <h2>Escala de color</h2>
           <div className="button-row wrap">
+            <button
+              type="button"
+              className={mode === 'none' ? 'active' : ''}
+              onClick={() => setMode('none')}
+              title="no recolorear, solo aplicar geometría (rotar/voltear/redimensionar)"
+            >
+              ninguna
+            </button>
             {colormaps.map((m) => (
               <button
                 key={m}

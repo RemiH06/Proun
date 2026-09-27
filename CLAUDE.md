@@ -90,7 +90,7 @@ proun/
                         __init__.py debe quedar VACÍO (imports ahí generan
                         falsos circulares en Windows)
 
-tests/                     895 pruebas, unittest estándar
+tests/                     898 pruebas, unittest estándar
 fuentes/                    archivo personal de imágenes del usuario, NO
                              se versiona
 docs/                       sitio de documentación (ver sección aparte)
@@ -299,6 +299,12 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   que ya está en inferno). `recolor.apply` no le importa de dónde salió
   el píxel, solo su brillo, así que cualquier archivo de la carpeta es un
   punto de partida válido.
+- **"ninguna" en "Escala de color"**: `recolor.mode = "none"` ya existía
+  en el motor (`recolor.apply` lo deja pasar tal cual), pero la pestaña
+  "recolorear" no lo exponía. El botón sirve para usar esa pestaña solo
+  para geometría (rotar/voltear/redimensionar un wallpaper ya exportado)
+  sin tocarle el color; exportarlo así da sufijo `_redimensionado` en vez
+  de un nombre de colormap.
 - **La pestaña "recolorear" también rota/voltea/redimensiona**, además de
   elegir colormap o negativo: controles "Rotar" (0/90/180/270, igual que
   `LayerConfigPanel`) y "Voltear" (↔/↕) aplican `proun.ops.rotate` antes

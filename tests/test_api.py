@@ -513,6 +513,33 @@ class Recolor(unittest.TestCase):
         self.assertEqual(destino, origen.with_stem("negativo_invertido"))
         self.assertTrue(destino.is_file())
 
+    def test_preview_mode_none_no_recolorea(self):
+        # Sin escala de color: el resultado tiene que ser igual al original
+        # (más allá de rotar/redimensionar, que acá no se pide).
+        resp = client.post("/api/recolor/preview", json={"path": str(WALLPAPER), "mode": "none"})
+        self.assertEqual(resp.status_code, 200)
+        with Image.open(WALLPAPER) as original:
+            self.assertEqual(Image.open(io.BytesIO(resp.content)).convert("RGB").tobytes(),
+                             original.convert("RGB").tobytes())
+
+    def test_preview_mode_none_si_respeta_geometria(self):
+        rectangular = RAIZ / "rectangular_none.png"
+        Image.linear_gradient("L").resize((90, 60)).convert("RGB").save(rectangular)
+        resp = client.post("/api/recolor/preview",
+                           json={"path": str(rectangular), "mode": "none", "angle": 90})
+        imagen = Image.open(io.BytesIO(resp.content))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(imagen.size, (60, 90))
+
+    def test_export_mode_none_da_sufijo_redimensionado(self):
+        origen = RAIZ / "sin_color.png"
+        Image.linear_gradient("L").resize((32, 32)).convert("RGB").save(origen)
+        resp = client.post("/api/recolor/export", json={"path": str(origen), "mode": "none"})
+        self.assertEqual(resp.status_code, 200)
+        destino = Path(resp.headers["x-export-path"])
+        self.assertEqual(destino, origen.with_stem("sin_color_redimensionado"))
+        self.assertTrue(destino.is_file())
+
     def test_preview_angle_90_cambia_el_tamano(self):
         # Un rectángulo (no cuadrado) delata el giro: ancho y alto se cruzan.
         rectangular = RAIZ / "rectangular.png"

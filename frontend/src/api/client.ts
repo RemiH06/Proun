@@ -368,7 +368,7 @@ export async function exportImage(
 // negativo, sin pasar por layers/compose: ver api/routes_recolor.py y
 // recolorear.py. angle/flipH/flipV/resolution son opcionales: rotan/
 // voltean y encajan en otra resolución antes de recolorear.
-export type RecolorMode = 'colormap' | 'invert'
+export type RecolorMode = 'colormap' | 'invert' | 'none'
 
 export type RecolorParams = {
   path: string
@@ -390,6 +390,7 @@ function recolorBody(p: RecolorParams) {
   }
   if (p.resolution) geometria.resolution = p.resolution
   if (p.mode === 'invert') return { ...geometria, mode: 'invert' }
+  if (p.mode === 'none') return { ...geometria, mode: 'none' }
   return p.stops ? { ...geometria, stops: p.stops } : { ...geometria, name: p.name }
 }
 
