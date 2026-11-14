@@ -61,7 +61,9 @@ recetas/                   configuraciones Python de ejemplo
 json/                      specs completas en JSON, alternativa a CONFIG
   exp.json                  playground con varios parámetros activados
   examen.json                receta completa del fondo de referencia
-  proun_ss4.json              semilla fija, reproduce un wallpaper exacto
+  ss4.json                    semilla fija, reproduce un wallpaper exacto
+  penrose.json, cuatricromia.json, campus.json
+                               obras de la landing (ver docs/obras.py)
   (rutas internas "src"/"pool" se resuelven relativas a la ubicación del
   propio archivo JSON, no al cwd: ver proun/spec.py::_relative_sources)
 
@@ -90,7 +92,7 @@ proun/
                         __init__.py debe quedar VACÍO (imports ahí generan
                         falsos circulares en Windows)
 
-tests/                     898 pruebas, unittest estándar
+tests/                     961 pruebas, unittest estándar
 fuentes/                    archivo personal de imágenes del usuario, NO
                              se versiona
 docs/                       sitio de documentación (ver sección aparte)
@@ -427,8 +429,36 @@ React) vía CDN de jsdelivr como módulo ES. Efectos:
   acento del contenedor del iframe (el papel y el rojo constructivista del
   sitio) y deriva de ahí los colores de los nodos. No hace falta tocar
   nada del sitio para que combine.
-- **Galería**: las cuatro capturas se ensamblan con un solo momento de
-  animación al entrar en pantalla, no una entrada genérica por sección.
+- **La página es una sala de exposición** (concepto: el *Prounenraum* de
+  Lissitzky, Berlín 1923, el Proun vuelto cuarto). Tres salas y una
+  colección, en vertical. De mirai (tema de iroFactory) se rescató solo la
+  señalética, no su japonés ni sus firmas (tiradas, imposición, hilo rojo,
+  puntos): rótulo vertical por sala **en cirílico** (`.sala-sign`, ЗАЛ I ·
+  БУМАГА, etc., `aria-hidden`, en Unbounded de Bunny Fonts porque Big
+  Shoulders no trae cirílico; Unbounded solo se usa ahí), contador con
+  marcas y una instrucción por sala, y la **ficha de sala** bajo cada obra
+  (técnica, datos, semilla y un `<details>` "ver receta" con el comando
+  exacto que la regenera).
+  - Sala clara: Penrose y Tinta, entran con `inView` (`.colgar`).
+  - Sala oscura: Vitrina y su versión k-means. Sin JS cuelgan lado a lado;
+    con `js-wipe` comparten marco y la k-means entra con el scroll tras una
+    línea roja (`clip-path`).
+  - Cuatro tintas: las cuatro planchas CMYK. Sin JS, políptico 2 x 2; con
+    `js-registro` la sección se fija (280vh) y las planchas viajan al centro
+    escalando a 2x hasta quedar en registro. Van en `mix-blend-mode:
+    multiply`, que reconstruye el original (error medio 0.19/255).
+  - Colección: carrusel horizontal con `scroll-snap` nativo (funciona sin
+    JS); los botones anterior/siguiente solo se muestran con `js-pin`.
+  - Con `prefers-reduced-motion` no se agregan `js-wipe` ni `js-registro`.
+- **Las obras las genera el motor, nunca maquetas**: `python docs/obras.py`
+  (necesita `fuentes/`) corre specs de `json/` (`penrose`, `cuatricromia`,
+  `campus`, `ss4`) y recetas con semilla (`tinta`, `vitrina`, `alineada`),
+  aplica las derivadas (k-means, planchas) con `recolorear.recolorear` y
+  escribe `docs/images/obras/<nombre>-{1600,800}.webp`. Regla de Remi: en la
+  página solo salen Prouns; una foto de `fuentes/` aparece solo si es parte
+  de uno, nunca suelta. `tests/test_docs.py` revisa que toda ruta local de
+  la landing exista, que cada obra colgada la genere `obras.py` y que cada
+  spec de `json/` construya (este último se salta sin `fuentes/`).
 
 ### Patrón de seguridad, repetido en cada efecto: léelo antes de tocar el JS
 

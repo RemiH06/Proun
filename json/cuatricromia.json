@@ -1,0 +1,49 @@
+{
+  "_nota": "Obra de docs/index.html. Collage a color sin recolorear, pensado para separarse en cuatro planchas (recolor.mode channels con tintas c/m/y/k, una a la vez).",
+  "output": "wallpapers/cuatricromia",
+  "resolutions": [
+    "1920x1080"
+  ],
+  "colors": [
+    "#d94f3d"
+  ],
+  "seeds": [
+    254619158
+  ],
+  "background": {
+    "solid": "#f2efe8"
+  },
+  "layers": {
+    "min": 9,
+    "max": 9
+  },
+  "layout": {
+    "mode": "scatter",
+    "bleed": 0.12,
+    "size": [
+      0.25,
+      0.6
+    ]
+  },
+  "finish": {
+    "grain": 0.02
+  },
+  "defaults": {
+    "rotate": "random",
+    "tones": null,
+    "recolor": {
+      "mode": "none"
+    }
+  },
+  "sources": [
+    "../fuentes/Cool pics/sea1.jpg",
+    "../fuentes/Cool pics/sky2.jpg",
+    "../fuentes/Ciudad/expiatorio.jpg",
+    "../fuentes/Ciudad/alberca.jpg",
+    "../fuentes/Cool pics/boats.jpg",
+    "../fuentes/Campus/papilio.png",
+    "../fuentes/Campus/cycloneda.png",
+    "../fuentes/Campus/salvia_leucantha.png",
+    "../fuentes/Campus/argemone_ochroleuca.png"
+  ]
+}

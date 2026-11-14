@@ -95,12 +95,12 @@ terreno de la CLI/JSON por ahora).
 ## Screenshots
 
 <p>
-  <img src="docs/images/proun_ss1.png" alt="Collage alineado, bordes compartidos tipo estantería" width="49%">
-  <img src="docs/images/proun_ss2.png" alt="Registro vitrina, luz sobre oscuridad" width="49%">
+  <img src="docs/images/obras/penrose-800.webp" alt="Triángulo de Penrose isométrico en rojo, tinta y papel, con cubo, marco y escalera" width="49%">
+  <img src="docs/images/obras/vitrina_kmeans-800.webp" alt="Radiografía de pez sierra clasificada en seis clases con k-means y pintada con magma" width="49%">
 </p>
 <p>
-  <img src="docs/images/proun_ss3.png" alt="Registro tinta, el fotograma sobre papel" width="49%">
-  <img src="docs/images/proun_ss4.png" alt="Registro retícula, constructivista" width="49%">
+  <img src="docs/images/obras/tinta-800.webp" alt="Registro tinta, radiografías espejadas sobre papel" width="49%">
+  <img src="docs/images/obras/reticula-800.webp" alt="Registro retícula, constructivista" width="49%">
 </p>
 
 Documentación con más ejemplos en [remih06.github.io/Proun](https://remih06.github.io/Proun/).

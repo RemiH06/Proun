@@ -47,7 +47,7 @@
   },
   "sources": [
     {
-      "src": "fuentes/Museos/wall.JPG",
+      "src": "../fuentes/Museos/wall.JPG",
       "cover": true,
       "opacity": 0.5,
       "recolor": {
@@ -60,20 +60,20 @@
         "edges": 0.4
       }
     },
-    "fuentes/Museos/sabertooth.JPG",
-    "fuentes/Museos/crouch.JPG",
-    "fuentes/Museos/three.JPG",
-    "fuentes/Museos/stones.JPG",
-    "fuentes/Museos/teeth.JPG",
+    "../fuentes/Museos/sabertooth.JPG",
+    "../fuentes/Museos/crouch.JPG",
+    "../fuentes/Museos/three.JPG",
+    "../fuentes/Museos/stones.JPG",
+    "../fuentes/Museos/teeth.JPG",
     {
-      "src": "fuentes/Museos/tut.JPG",
+      "src": "../fuentes/Museos/tut.JPG",
       "crop": {
         "aspect": "1:2",
         "anchor": "center"
       }
     },
     {
-      "src": "fuentes/Museos/squares.JPG",
+      "src": "../fuentes/Museos/squares.JPG",
       "rotate": null,
       "repeat": {
         "step": [
@@ -85,7 +85,7 @@
       }
     },
     {
-      "src": "fuentes/Museos/tests.JPG",
+      "src": "../fuentes/Museos/tests.JPG",
       "rotate": null,
       "repeat": {
         "step": [
@@ -97,7 +97,7 @@
       }
     },
     {
-      "src": "fuentes/Museos/golden2.JPG",
+      "src": "../fuentes/Museos/golden2.JPG",
       "rotate": null,
       "repeat": {
         "step": [
@@ -109,7 +109,7 @@
       }
     },
     {
-      "src": "fuentes/Museos/small.JPG",
+      "src": "../fuentes/Museos/small.JPG",
       "color": "#f2f0e6",
       "opacity": 0.95,
       "resize": {

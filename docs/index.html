@@ -4,8 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Proun: generador de wallpapers tipo collage</title>
-<meta name="description" content="Proun genera wallpapers de collage con paleta normalizada, inspirado en el fotomontaje constructivista de El Lissitzky. Sin dependencias más allá de Pillow.">
+<meta name="description" content="Proun genera wallpapers de collage con paleta normalizada, inspirado en el fotomontaje constructivista de El Lissitzky. Motor en Python con Pillow y editor visual en React.">
 <link rel="icon" type="image/svg+xml" href="images/logo.svg">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link rel="stylesheet" href="https://fonts.bunny.net/css?family=unbounded:700&display=swap">
 
 <style>
   @font-face {
@@ -25,16 +27,29 @@
     --paper: #f2efe8;
     --paper-dim: #e8e3d6;
     --ink: #141210;
+    --ink-line: #3a352f;
     --red: #d94f3d;
+    /* El rojo de marca no pasa 4.5:1 sobre papel (3.56): solo va en texto
+    grande o en trazos. Enlaces y texto chico sobre papel usan este. */
+    --red-ink: #b73a2a;
     --grey: #6b6156;
+    --grey-dark: #a39a8c;
     --line: #cabfad;
     --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
     --display: "Big Shoulders", sans-serif;
+    /* Big Shoulders no trae cirílico: la señalética de las salas va en
+    Unbounded, y solo ella. */
+    --sign: "Unbounded", "Big Shoulders", sans-serif;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   }
 
   * { box-sizing: border-box; }
 
   html { scroll-behavior: smooth; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
 
   body {
     margin: 0;
@@ -45,21 +60,30 @@
     line-height: 1.6;
   }
 
-  a { color: var(--red); }
-  a:focus-visible, button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+  a { color: var(--red-ink); }
+  a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+    outline: 3px solid var(--red);
+    outline-offset: 2px;
+  }
 
   .wrap {
-    max-width: 1040px;
+    max-width: 1120px;
     margin: 0 auto;
     padding: 0 28px;
   }
 
-  /* ---------- header ---------- */
+  @media (max-width: 640px) {
+    .wrap { padding: 0 16px; }
+  }
 
-  /* Secuencia: las dos puertas naranjas ya están cerradas y visibles desde
+  img { max-width: 100%; }
+
+  /* ---------- intro ---------- */
+
+  /* Secuencia: las dos puertas rojas ya están cerradas y visibles desde
   el arranque (se traen a su lugar en el mismo golpe que agrega la clase,
   seguro porque solo pasa si el import tuvo éxito). Encima, una línea negra
-  crece desde el centro, de forma errante, hasta tocar arriba y abajo.
+  crece desde el centro, de forma errante, hasta casi tocar arriba y abajo.
   Recién entonces la línea se oculta y las puertas se separan hacia los
   lados. Por defecto todo está invisible o fuera de pantalla: si el script
   nunca corre, la página se ve normal desde el primer pintado. */
@@ -84,9 +108,6 @@
   .js-intro .intro-left { transform: translateX(0); }
   .js-intro .intro-right { transform: translateX(0); }
 
-  /* Puertas auxiliares: mucho más chicas que las laterales, arriba y abajo
-  del todo. La barra negra ya no necesita llegar a los bordes: se detiene
-  un poco antes, y estas dos se abren justo ahí como remate. */
   .intro-cap {
     position: absolute;
     left: 0;
@@ -112,13 +133,14 @@
 
   .js-intro .intro-line { opacity: 1; }
 
+  /* ---------- entrada (hero) ---------- */
+
   .hero-pin-wrap { position: relative; }
 
-  /* Sin JS, el header es un bloque normal de una pantalla, como antes: se
-  aleja al hacer scroll sin dejar hueco. Con JS (clase agregada por el
-  script, solo si el import de Motion tuvo éxito), el envoltorio crece a
-  tres pantallas y el header se fija adentro, dando espacio para que el
-  desenfoque aparezca, se sostenga el doble de tiempo, y recién entonces la
+  /* Sin JS, el header es un bloque normal de una pantalla. Con JS (clase
+  agregada por el script, solo si el import de Motion tuvo éxito), el
+  envoltorio crece a tres pantallas y el header se fija adentro, dando
+  espacio para que el desenfoque aparezca, se sostenga, y recién entonces la
   imagen se aleje un poco. */
   .js-pin .hero-pin-wrap { height: 300vh; }
 
@@ -150,15 +172,17 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: 50% 30%;
-    filter: grayscale(0.15) blur(0px);
+    object-position: 50% 50%;
+    filter: blur(0px);
     will-change: filter;
   }
 
+  /* 0.64 de tinta sobre el punto más claro de la obra (el papel) deja el
+  subtítulo arriba de 4.5:1. */
   .hero-scrim {
     position: absolute;
     inset: 0;
-    background: rgba(20, 18, 16, 0.4);
+    background: rgba(20, 18, 16, 0.64);
   }
 
   .hero-text {
@@ -188,9 +212,9 @@
   .hero-subtitle {
     font-family: var(--display);
     font-weight: 400;
-    font-size: clamp(15px, 2vw, 19px);
+    font-size: clamp(16px, 2vw, 19px);
     letter-spacing: 0.02em;
-    color: var(--paper-dim);
+    color: var(--paper);
     max-width: 30em;
     margin: 18px 0 0;
   }
@@ -201,19 +225,35 @@
     right: 28px;
     bottom: 22px;
     font-family: var(--display);
-    font-size: 13px;
+    font-size: 14px;
     letter-spacing: 0.05em;
-    color: var(--paper-dim);
+    color: var(--paper);
   }
 
-  /* ---------- hero ---------- */
+  /* El rótulo de la puerta: ПРОУН corre vertical por el borde, como en los
+  carteles de Klutsis, leído de abajo hacia arriba. */
+  .hero-sign {
+    position: absolute;
+    z-index: 2;
+    left: 22px;
+    bottom: 22px;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: var(--sign);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.08em;
+    color: var(--red);
+  }
 
-  .hero {
-    padding: 72px 0 48px;
+  /* ---------- texto de sala ---------- */
+
+  .lead {
+    padding: 80px 0 64px;
     border-bottom: 1px solid var(--line);
   }
 
-  .hero-grid {
+  .lead-grid {
     display: grid;
     grid-template-columns: 1.1fr 0.9fr;
     gap: 48px;
@@ -221,10 +261,10 @@
   }
 
   @media (max-width: 760px) {
-    .hero-grid { grid-template-columns: 1fr; }
+    .lead-grid { grid-template-columns: 1fr; gap: 32px; }
   }
 
-  .hero h1 {
+  .lead h2 {
     font-family: var(--display);
     font-weight: 700;
     font-size: clamp(32px, 4.6vw, 48px);
@@ -233,7 +273,7 @@
     max-width: 14em;
   }
 
-  .hero p { margin: 0 0 16px; }
+  .lead p { margin: 0 0 16px; }
 
   .quote {
     font-family: var(--display);
@@ -255,67 +295,406 @@
     margin-top: 10px;
   }
 
-  /* ---------- galería ---------- */
+  /* ---------- salas ---------- */
 
-  .gallery-section { padding: 64px 0 88px; }
+  .sala {
+    position: relative;
+    padding: 104px 0 112px;
+    border-bottom: 1px solid var(--line);
+  }
 
-  .gallery-heading {
+  .sala-oscura {
+    background: var(--ink);
+    color: var(--paper);
+    border-bottom: 0;
+  }
+
+  /* Rótulo de sala, vertical y en cirílico. Es señalética: decorativo,
+  aria-hidden, el título real de la sala es el h2. */
+  .sala-sign {
+    position: absolute;
+    top: 104px;
+    left: 24px;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: var(--sign);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    color: var(--red);
+    margin: 0;
+  }
+
+  .sala .wrap { padding-left: 96px; }
+
+  @media (max-width: 900px) {
+    .sala { padding: 72px 0 80px; }
+    .sala .wrap { padding-left: 28px; }
+    .sala-sign {
+      position: static;
+      writing-mode: horizontal-tb;
+      transform: none;
+      font-size: 18px;
+      max-width: 1120px;
+      margin: 0 auto 20px;
+      padding: 0 28px;
+      white-space: normal;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .sala .wrap { padding-left: 16px; }
+    .sala-sign { padding: 0 16px; }
+  }
+
+  .sala-head { margin: 0 0 56px; max-width: 40em; }
+
+  .sala-count {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--display);
+    font-size: 15px;
+    letter-spacing: 0.06em;
+    color: var(--grey);
+    margin: 0 0 14px;
+  }
+
+  .sala-oscura .sala-count { color: var(--grey-dark); }
+
+  /* Las marcas del contador: una por sala, llenas hasta la actual. */
+  .ticks { display: inline-flex; gap: 4px; }
+  .ticks i {
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid currentColor;
+  }
+  .ticks i.on { background: var(--red); border-color: var(--red); }
+
+  .sala h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(40px, 6vw, 72px);
+    line-height: 0.95;
+    margin: 0 0 16px;
+  }
+
+  .sala-instr {
+    font-style: italic;
+    font-size: 20px;
+    margin: 0;
+  }
+
+  /* ---------- obras y fichas ---------- */
+
+  .obra { margin: 0; }
+
+  .obra img {
+    display: block;
+    width: 100%;
+    height: auto;
+    box-shadow: 0 0 0 1px var(--ink), 0 22px 36px -24px rgba(20, 18, 16, 0.55);
+  }
+
+  .sala-oscura .obra img { box-shadow: 0 0 0 1px var(--ink-line); }
+
+  .muro {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    row-gap: 88px;
+  }
+
+  .muro .obra:nth-child(1) { grid-column: 1 / -1; }
+  .muro .obra:nth-child(2) { grid-column: 5 / -1; }
+
+  @media (max-width: 760px) {
+    .muro { row-gap: 56px; }
+    .muro .obra:nth-child(n) { grid-column: 1 / -1; }
+  }
+
+  /* La ficha de sala: título, técnica, datos y la receta que la regenera. */
+  .ficha {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 24px;
+    border-top: 1.5px solid currentColor;
+    margin-top: 18px;
+    padding-top: 12px;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .ficha > * { grid-column: 1; }
+
+  .ficha-num {
+    grid-column: 2;
+    grid-row: 1;
     font-family: var(--display);
     font-weight: 700;
     font-size: 15px;
-    letter-spacing: 0.04em;
     color: var(--grey);
-    margin: 0 0 40px;
   }
 
-  .gallery {
-    position: relative;
+  .sala-oscura .ficha-num, .sala-oscura .ficha-datos { color: var(--grey-dark); }
+
+  .ficha-titulo {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1.1;
+    margin: 0 0 4px;
+  }
+
+  .ficha p { margin: 0; }
+
+  .ficha-datos {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--grey);
+    margin-top: 6px !important;
+    overflow-wrap: anywhere;
+  }
+
+  .ficha details { margin-top: 8px; }
+
+  .ficha summary {
+    display: inline-block;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.04em;
+    color: var(--red-ink);
+    cursor: pointer;
+    padding: 4px 0;
+    list-style: none;
+  }
+
+  .ficha summary::-webkit-details-marker { display: none; }
+  .ficha summary::before { content: "+ "; }
+  .ficha details[open] summary::before { content: "− "; }
+
+  .sala-oscura .ficha summary { color: var(--red); }
+
+  .ficha pre { margin-top: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  .sala-oscura .ficha pre { background: #0a0908; border: 1px solid var(--ink-line); }
+
+  /* ---------- sala oscura: el par ---------- */
+
+  /* Sin JS, las dos obras cuelgan lado a lado (una encima de otra en
+  teléfono), cada una con su ficha. Con JS (js-wipe, solo si Motion cargó),
+  comparten un solo marco: la segunda entra sobre la primera con el scroll,
+  detrás de una línea roja, y las fichas quedan debajo, lado a lado. */
+  .par {
     display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 0;
-    padding: 20px 0 40px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "a b" "fa fb";
+    column-gap: 32px;
   }
 
-  .gallery figure {
-    margin: 0;
+  .par-a { grid-area: a; }
+  .par-b { grid-area: b; }
+  .par-fa { grid-area: fa; }
+  .par-fb { grid-area: fb; }
+
+  .par-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    box-shadow: 0 0 0 1px var(--ink-line);
+  }
+
+  .par-marco-linea { display: none; }
+
+  @media (max-width: 760px) {
+    .par {
+      grid-template-columns: 1fr;
+      grid-template-areas: "a" "fa" "b" "fb";
+    }
+    .par-fa { margin-bottom: 48px; }
+  }
+
+  .js-wipe .par {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "a a" "fa fb";
+  }
+
+  .js-wipe .par-b {
+    grid-area: a;
     position: relative;
-    box-shadow: 0 0 0 1px var(--ink);
+    z-index: 1;
   }
 
-  .gallery img {
+  .js-wipe .par-marco-linea {
+    display: block;
+    grid-area: a;
+    position: relative;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .js-wipe .par-linea {
+    position: absolute;
+    top: -12px;
+    bottom: -12px;
+    left: 0;
+    width: 3px;
+    margin-left: -1.5px;
+    background: var(--red);
+  }
+
+  @media (max-width: 760px) {
+    .js-wipe .par { grid-template-columns: 1fr; grid-template-areas: "a" "fa" "fb"; }
+    .js-wipe .par-fa { margin-bottom: 8px; }
+  }
+
+  /* ---------- cuatro tintas: el registro ---------- */
+
+  /* Sin JS es un políptico de 2 x 2: cuatro planchas colgadas por separado.
+  Con JS (js-registro) la sección crece a varias pantallas, la escena se
+  fija y las planchas se deslizan hasta quedar en registro. Están en
+  mix-blend-mode: multiply, que es lo que hace la tinta sobre el papel: al
+  sobreponerse vuelven a dar la imagen a color (error medio de 0.19 sobre
+  255 contra el original, medido al generarlas). */
+  .registro-escena {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    isolation: isolate;
+    background: var(--paper);
+  }
+
+  .plancha {
+    position: relative;
+    margin: 0;
+    mix-blend-mode: multiply;
+  }
+
+  .plancha img {
     display: block;
     width: 100%;
     height: auto;
   }
 
-  .gallery figcaption {
+  .plancha-tinta {
+    position: absolute;
+    left: 10px;
+    top: 8px;
     font-family: var(--display);
-    font-size: 13px;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--ink);
+    opacity: calc(1 - var(--t, 0) * 3);
+  }
+
+  .registro-nota {
+    font-family: var(--display);
+    font-size: 16px;
     letter-spacing: 0.04em;
     color: var(--grey);
-    margin-top: 10px;
+    margin: 14px 0 0;
   }
 
-  .g1 { grid-column: 1 / 8; transform: rotate(-1.1deg); z-index: 3; }
-  .g2 { grid-column: 7 / 13; margin-top: 90px; transform: rotate(0.8deg); z-index: 2; }
-  .g3 { grid-column: 2 / 7; margin-top: 60px; transform: rotate(0.6deg); z-index: 1; }
-  .g4 { grid-column: 6 / 12; margin-top: 20px; transform: rotate(-0.7deg); z-index: 2; }
+  .js-registro .registro { height: 280vh; }
 
-  @media (max-width: 760px) {
-    .gallery { grid-template-columns: 1fr; row-gap: 32px; }
-    .g1, .g2, .g3, .g4 {
-      grid-column: 1 / -1;
-      margin-top: 0;
-      transform: none;
-    }
+  .js-registro .registro-pin {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
 
-  .gallery figure { will-change: transform, opacity; }
+  .js-registro .registro-escena {
+    display: block;
+    position: relative;
+    width: min(100%, calc((100vh - 140px) * 16 / 9));
+    aspect-ratio: 16 / 9;
+    margin: 0 auto;
+  }
+
+  .js-registro .plancha {
+    position: absolute;
+    width: 50%;
+    height: 50%;
+    transform: scale(0.94);
+  }
+
+  .js-registro .plancha:nth-child(1) { left: 0; top: 0; }
+  .js-registro .plancha:nth-child(2) { left: 50%; top: 0; }
+  .js-registro .plancha:nth-child(3) { left: 0; top: 50%; }
+  .js-registro .plancha:nth-child(4) { left: 50%; top: 50%; }
+
+  .js-registro .plancha img { height: 100%; }
+
+  .js-registro .registro-nota {
+    text-align: center;
+    opacity: var(--t, 0);
+  }
+
+  /* ---------- colección (carrusel) ---------- */
+
+  /* Desplazamiento nativo con scroll-snap: funciona sin JS, con rueda, con
+  el dedo y con el teclado (la lista es enfocable). Los botones solo
+  aparecen si el script corrió. */
+  .coleccion {
+    display: flex;
+    gap: 28px;
+    margin: 0;
+    padding: 4px 4px 24px;
+    list-style: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-left: 4px;
+    scrollbar-color: var(--grey) transparent;
+  }
+
+  .pieza {
+    flex: 0 0 min(80vw, 420px);
+    scroll-snap-align: start;
+  }
+
+  .pieza figure { margin: 0; }
+
+  .pieza img {
+    display: block;
+    width: 100%;
+    height: auto;
+    box-shadow: 0 0 0 1px var(--ink);
+  }
+
+  .pieza .ficha { font-size: 15px; }
+  .pieza .ficha-titulo { font-size: 21px; }
+
+  .coleccion-nav {
+    display: none;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .js-pin .coleccion-nav { display: flex; }
+
+  .coleccion-nav button {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: 0.03em;
+    min-height: 44px;
+    padding: 8px 18px;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1.5px solid var(--ink);
+    cursor: pointer;
+  }
+
+  .coleccion-nav button:hover { background: var(--ink); color: var(--paper); }
 
   /* ---------- acerca ---------- */
 
   .about {
-    padding: 64px 0;
+    padding: 72px 0;
     background: var(--ink);
     color: var(--paper);
   }
@@ -327,7 +706,7 @@
   }
 
   @media (max-width: 760px) {
-    .about .wrap { grid-template-columns: 1fr; }
+    .about .wrap { grid-template-columns: 1fr; gap: 24px; }
   }
 
   .about h2 {
@@ -339,8 +718,6 @@
 
   .about p { color: #d8d2c4; }
   .about a { color: var(--red); }
-
-  /* ---------- features ---------- */
 
   /* ---------- tabs + stage ---------- */
 
@@ -374,17 +751,14 @@
   }
 
   /* En una fila que envuelve, el indicador (bottom:0 del contenedor) queda
-  pegado al final de TODAS las filas, no a la de la tab activa: si esa tab
-  cae en la primera fila, el indicador aparece flotando bien abajo, sin
-  relación visible con ella. Más angosto que esto ya no entran 3-4 tabs
-  sin envolver, así que en vez de pelear con eso la fila se vuelve
-  desplazable (una sola línea, scroll horizontal) y el indicador vuelve a
-  tener sentido siempre. */
+  pegado al final de TODAS las filas, no a la de la tab activa. Más angosto
+  que esto la fila se vuelve desplazable (una sola línea, scroll
+  horizontal) y el indicador vuelve a tener sentido siempre. */
   @media (max-width: 640px) {
     .tabs {
       flex-wrap: nowrap;
       overflow-x: auto;
-      padding: 0 20px;
+      padding: 0 16px;
       scrollbar-width: none;
     }
     .tabs::-webkit-scrollbar { display: none; }
@@ -425,8 +799,8 @@
   }
 
   @media (max-width: 640px) {
-    .stage { padding: 28px 20px 0; }
-    .panel-dark { margin: 0 -20px; padding: 24px 20px; }
+    .stage { padding: 28px 16px 0; }
+    .panel-dark { margin: 0 -16px; padding: 24px 16px; }
   }
 
   .panel-intro {
@@ -435,16 +809,11 @@
     margin: 0 0 36px;
   }
 
-  /* Como .panel-intro pero para un panel sobre el fondo claro del stage
-  (panel-usage es el único oscuro): el gris clarito de .panel-intro está
-  pensado para leerse sobre tinta, no sobre papel. */
   .panel-lead {
     max-width: 42em;
     color: var(--grey);
     margin: 0 0 24px;
   }
-
-  .panel-lead a { color: var(--red); }
 
   .graph-frame {
     border: 1px solid var(--line);
@@ -514,10 +883,10 @@
 
   .config-item {
     display: grid;
-    grid-template-columns: 160px 1fr;
+    grid-template-columns: 200px 1fr;
     gap: 18px;
     padding: 18px 0;
-    border-top: 1px solid #3a352f;
+    border-top: 1px solid var(--ink-line);
   }
 
   @media (max-width: 640px) {
@@ -525,7 +894,7 @@
   }
 
   .config-item code {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-family: var(--mono);
     font-size: 15px;
     color: var(--red);
     align-self: start;
@@ -535,18 +904,17 @@
 
   .panel-dark pre {
     background: #0a0908;
-    border: 1px solid #3a352f;
+    border: 1px solid var(--ink-line);
   }
 
   .steps {
-    counter-reset: step;
     display: grid;
     gap: 28px;
   }
 
   .step {
     display: grid;
-    grid-template-columns: 56px 1fr;
+    grid-template-columns: 56px minmax(0, 1fr);
     gap: 18px;
     align-items: start;
   }
@@ -556,7 +924,7 @@
     font-weight: 700;
     font-size: 40px;
     line-height: 1;
-    color: var(--red);
+    color: var(--red-ink);
   }
 
   .step h3 {
@@ -569,7 +937,7 @@
   .step p { margin: 0 0 10px; color: var(--ink); }
 
   code, pre {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-family: var(--mono);
     font-size: 15px;
   }
 
@@ -632,23 +1000,25 @@
 <div class="hero-pin-wrap" id="hero-pin-wrap">
 <header id="hero-header">
   <div class="hero-media" aria-hidden="true">
-    <img src="images/proun_ss1.png" alt="">
+    <img src="images/obras/penrose-1600.webp" srcset="images/obras/penrose-800.webp 800w, images/obras/penrose-1600.webp 1600w" sizes="100vw" width="1600" height="900" alt="">
     <div class="hero-scrim"></div>
   </div>
   <div class="hero-text">
     <h1 class="hero-title">Proun</h1>
     <p class="hero-subtitle">Genera un wallpaper a partir de imágenes de tu galería.</p>
   </div>
-  <span class="hero-credit">v1.0 · by RemLam (@RemiH06)</span>
+  <p class="hero-sign" lang="ru" aria-hidden="true">ПРОУН</p>
+  <span class="hero-credit">v2.0 · by RemLam (@RemiH06)</span>
 </header>
 </div>
 
-<section class="hero">
-  <div class="wrap hero-grid">
+<main>
+<section class="lead">
+  <div class="wrap lead-grid">
     <div>
-      <h1>La estación de trasbordo entre tu archivo personal y una sola paleta</h1>
+      <h2>La estación de trasbordo entre tu archivo personal y una sola paleta</h2>
       <p>Proun toma imágenes de cualquier origen (una radiografía de museo, una foto de la prepa, un cianotipo de 1843) y las obliga a existir en el mismo registro tonal. No decora tus fotos: las recompone.</p>
-      <p>Corre por línea de comandos o editando un archivo de configuración en Python. Sin dependencias más allá de Pillow. Cada wallpaper lleva su semilla en el nombre, así que cualquiera se puede regenerar exacto.</p>
+      <p>En 1923, El Lissitzky sacó el Proun del cuadro y lo volvió cuarto: el <em>Prounenraum</em>, una sala entera en la Gran Exposición de Arte de Berlín. Esta página se recorre igual, en tres salas y una colección. Todo lo que cuelga aquí lo generó el motor, y cada ficha dice con qué receta y qué semilla volver a sacarlo.</p>
     </div>
     <blockquote class="quote">
       &ldquo;La estación de trasbordo entre la pintura y la arquitectura.&rdquo;
@@ -657,26 +1027,172 @@
   </div>
 </section>
 
-<section class="gallery-section">
+<section class="sala" id="sala-clara" aria-labelledby="h-sala-clara">
+  <p class="sala-sign" lang="ru" aria-hidden="true">ЗАЛ I · БУМАГА</p>
   <div class="wrap">
-    <p class="gallery-heading">Cuatro registros de la misma herramienta</p>
-    <div class="gallery">
-      <figure class="g1" data-rotate="-1.1">
-        <img src="images/proun_ss1.png" alt="Collage denso de fotos de museo, radiografías y cianotipos, empaquetados en una banda con papel vacío alrededor" loading="lazy">
-        <figcaption>Alineada, bordes compartidos, tipo estantería</figcaption>
+    <div class="sala-head">
+      <p class="sala-count">sala 01 / 03 <span class="ticks" aria-hidden="true"><i class="on"></i><i></i><i></i></span></p>
+      <h2 id="h-sala-clara">Sala clara</h2>
+      <p class="sala-instr">Tinta sobre papel: lo claro desaparece y lo oscuro se acumula.</p>
+    </div>
+    <div class="muro">
+      <figure class="obra colgar">
+        <img src="images/obras/penrose-1600.webp" srcset="images/obras/penrose-800.webp 800w, images/obras/penrose-1600.webp 1600w" sizes="(max-width: 1120px) 100vw, 1000px" width="1600" height="900" loading="lazy" alt="Un triángulo de Penrose isométrico en rojo, tinta y papel al centro, rodeado de un cubo, un marco hueco y una escalera en los mismos tres tonos, sobre fotos de museo en tinta.">
+        <figcaption class="ficha">
+          <p class="ficha-titulo">Penrose</p>
+          <span class="ficha-num">01</span>
+          <p>Figuras isométricas a tres colores por cara (un colormap de tres paradas: derecha, izquierda, arriba), sobre fotos de museo pasadas a tinta con multiply. El triángulo es imposible: su tercer brazo se pinta como si estuviera detrás del primero.</p>
+          <p class="ficha-datos">1920 × 1080 px · 3 tintas: #141210 + #d94f3d + #e2dccf · semilla 940143726</p>
+          <details>
+            <summary>ver receta</summary>
+            <pre>python main.py --spec json/penrose.json</pre>
+          </details>
+        </figcaption>
       </figure>
-      <figure class="g2" data-rotate="0.8">
-        <img src="images/proun_ss2.png" alt="Radiografías y esqueletos en luz sobre fondo oscuro, con vignette" loading="lazy">
-        <figcaption>Vitrina, luz sobre oscuridad</figcaption>
+      <figure class="obra colgar">
+        <img src="images/obras/tinta-1600.webp" srcset="images/obras/tinta-800.webp 800w, images/obras/tinta-1600.webp 1600w" sizes="(max-width: 760px) 100vw, 680px" width="1600" height="900" loading="lazy" alt="Radiografías de peces en tinta oscura sobre papel claro; dos de ellas, espejadas sobre sí mismas, forman una mariposa simétrica al centro.">
+        <figcaption class="ficha">
+          <p class="ficha-titulo">Tinta</p>
+          <span class="ficha-num">02</span>
+          <p>Radiografías invertidas y espejadas sobre sí mismas, de donde salen las mariposas. Solo lo oscuro de cada foto sobrevive.</p>
+          <p class="ficha-datos">1920 × 1080 px · color principal #1c1c1c · semilla 246884557</p>
+          <details>
+            <summary>ver receta</summary>
+            <pre>python -m recetas.tinta --seeds 246884557 --colors 1c1c1c --resolutions 1920x1080</pre>
+          </details>
+        </figcaption>
       </figure>
-      <figure class="g3" data-rotate="0.6">
-        <img src="images/proun_ss3.png" alt="Fotos convertidas a tinta oscura acumulándose sobre papel claro" loading="lazy">
-        <figcaption>Tinta, el registro de fotograma</figcaption>
-      </figure>
-      <figure class="g4" data-rotate="-0.7">
-        <img src="images/proun_ss4.png" alt="Retícula de piezas giradas en múltiplos de noventa grados, en rojo constructivista" loading="lazy">
-        <figcaption>Retícula, el registro constructivista</figcaption>
-      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="sala sala-oscura" id="sala-oscura" aria-labelledby="h-sala-oscura">
+  <p class="sala-sign" lang="ru" aria-hidden="true">ЗАЛ II · СВЕТ</p>
+  <div class="wrap">
+    <div class="sala-head">
+      <p class="sala-count">sala 02 / 03 <span class="ticks" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i></span></p>
+      <h2 id="h-sala-oscura">Sala oscura</h2>
+      <p class="sala-instr">Baja despacio: la misma luz, reducida a seis clases.</p>
+    </div>
+    <div class="par">
+      <img class="par-img par-a" src="images/obras/vitrina-1600.webp" srcset="images/obras/vitrina-800.webp 800w, images/obras/vitrina-1600.webp 1600w" sizes="(max-width: 760px) 100vw, 1000px" width="1600" height="900" loading="lazy" alt="Radiografías en azul pálido sobre fondo casi negro: un pez sierra cruza en diagonal, con anguilas y esqueletos enroscados alrededor.">
+      <img class="par-img par-b" src="images/obras/vitrina_kmeans-1600.webp" srcset="images/obras/vitrina_kmeans-800.webp 800w, images/obras/vitrina_kmeans-1600.webp 1600w" sizes="(max-width: 760px) 100vw, 1000px" width="1600" height="900" loading="lazy" alt="La misma composición del pez sierra reducida a seis colores planos, de negro a morado, naranja y crema, como un cartel serigrafiado.">
+      <div class="par-marco-linea" aria-hidden="true"><span class="par-linea"></span></div>
+      <div class="ficha par-fa">
+        <p class="ficha-titulo">Vitrina</p>
+        <span class="ficha-num">03</span>
+        <p>Radiografías en luz sobre oscuridad, acumuladas con screen.</p>
+        <p class="ficha-datos">color principal #7fb6d9 · semilla 959423107</p>
+        <details>
+          <summary>ver receta</summary>
+          <pre>python -m recetas.vitrina --seeds 959423107 --colors 7fb6d9 --resolutions 1920x1080</pre>
+        </details>
+      </div>
+      <div class="ficha par-fb">
+        <p class="ficha-titulo">Vitrina en k-means</p>
+        <span class="ficha-num">04</span>
+        <p>La misma pieza clasificada en 6 clases y pintada de oscura a clara con magma, con filtro de mayoría de 3 × 3.</p>
+        <p class="ficha-datos">6 clases · magma · semilla 959423107</p>
+        <details>
+          <summary>ver receta</summary>
+          <pre>python recolorear.py vitrina.png --kmeans 6 --name magma --smooth 3</pre>
+        </details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sala" id="cuatro-tintas" aria-labelledby="h-cuatro-tintas">
+  <p class="sala-sign" lang="ru" aria-hidden="true">ЗАЛ III · ЧЕТЫРЕ КРАСКИ</p>
+  <div class="wrap">
+    <div class="sala-head">
+      <p class="sala-count">sala 03 / 03 <span class="ticks" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i></span></p>
+      <h2 id="h-cuatro-tintas">Cuatro tintas</h2>
+      <p class="sala-instr">Sigue bajando: las cuatro planchas entran en registro.</p>
+    </div>
+    <div class="registro">
+      <div class="registro-pin">
+        <div class="registro-escena">
+          <figure class="plancha">
+            <img src="images/obras/plancha_c-1600.webp" srcset="images/obras/plancha_c-800.webp 800w, images/obras/plancha_c-1600.webp 1600w" sizes="(max-width: 760px) 50vw, 560px" width="1600" height="900" loading="lazy" alt="Plancha cian: solo el azul del cielo, el mar y la alberca.">
+            <figcaption class="plancha-tinta">c · cian</figcaption>
+          </figure>
+          <figure class="plancha">
+            <img src="images/obras/plancha_m-1600.webp" srcset="images/obras/plancha_m-800.webp 800w, images/obras/plancha_m-1600.webp 1600w" sizes="(max-width: 760px) 50vw, 560px" width="1600" height="900" loading="lazy" alt="Plancha magenta: la catarina, las flores moradas y las sombras rosadas.">
+            <figcaption class="plancha-tinta">m · magenta</figcaption>
+          </figure>
+          <figure class="plancha">
+            <img src="images/obras/plancha_y-1600.webp" srcset="images/obras/plancha_y-800.webp 800w, images/obras/plancha_y-1600.webp 1600w" sizes="(max-width: 760px) 50vw, 560px" width="1600" height="900" loading="lazy" alt="Plancha amarilla: las hojas, el centro de la flor y las alas de la mariposa.">
+            <figcaption class="plancha-tinta">y · amarillo</figcaption>
+          </figure>
+          <figure class="plancha">
+            <img src="images/obras/plancha_k-1600.webp" srcset="images/obras/plancha_k-800.webp 800w, images/obras/plancha_k-1600.webp 1600w" sizes="(max-width: 760px) 50vw, 560px" width="1600" height="900" loading="lazy" alt="Plancha negra: el collage completo en escala de grises.">
+            <figcaption class="plancha-tinta">k · negro</figcaption>
+          </figure>
+        </div>
+        <p class="registro-nota">c + m + y + k, multiplicadas sobre el papel</p>
+      </div>
+    </div>
+    <div class="ficha">
+      <p class="ficha-titulo">Cuatricromía</p>
+      <span class="ficha-num">05</span>
+      <p>Un collage a color separado en cuatro planchas con negro real: K es lo que le falta al canal más brillante para llegar a 255, y cada tinta es lo que le falta a su canal para alcanzar ese máximo. Sobrepuestas por multiplicación, como la tinta sobre el papel, vuelven a dar la imagen.</p>
+      <p class="ficha-datos">1920 × 1080 px · 4 tintas: c + m + y + k · semilla 254619158</p>
+      <details>
+        <summary>ver receta</summary>
+        <pre>python main.py --spec json/cuatricromia.json
+# y por plancha, una sola tinta encendida:
+recolor: {"mode": "channels", "channels": {"c": [1, 0], "m": [0, 0], "y": [0, 0], "k": [0, 0]}}</pre>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="sala" id="coleccion" aria-labelledby="h-coleccion">
+  <p class="sala-sign" lang="ru" aria-hidden="true">СОБРАНИЕ</p>
+  <div class="wrap">
+    <div class="sala-head">
+      <p class="sala-count">colección · 8 piezas</p>
+      <h2 id="h-coleccion">Colección</h2>
+      <p class="sala-instr">Desliza: cada una dice de qué está hecha.</p>
+    </div>
+    <ul class="coleccion" tabindex="0" aria-label="Colección de Prouns, se desplaza de lado">
+      <li class="pieza"><figure>
+        <img src="images/obras/penrose-800.webp" width="800" height="450" loading="lazy" alt="Penrose isométrico en rojo, tinta y papel, con cubo, marco y escalera.">
+        <figcaption class="ficha"><p class="ficha-titulo">Penrose</p><p>Figuras isométricas a tres colores por cara sobre fotos de museo en tinta.</p><p class="ficha-datos">iso · colormap de 3 paradas · 940143726</p></figcaption>
+      </figure></li>
+      <li class="pieza"><figure>
+        <img src="images/obras/tinta-800.webp" width="800" height="450" loading="lazy" alt="Radiografías de peces en tinta sobre papel, espejadas en forma de mariposa.">
+        <figcaption class="ficha"><p class="ficha-titulo">Tinta</p><p>Radiografías invertidas y espejadas, multiply sobre papel con manchas.</p><p class="ficha-datos">duotone · multiply · 246884557</p></figcaption>
+      </figure></li>
+      <li class="pieza"><figure>
+        <img src="images/obras/vitrina-800.webp" width="800" height="450" loading="lazy" alt="Radiografía de un pez sierra en azul pálido sobre fondo oscuro.">
+        <figcaption class="ficha"><p class="ficha-titulo">Vitrina</p><p>Luz sobre oscuridad: el extremo oscuro de cada foto se vuelve transparente.</p><p class="ficha-datos">duotone · screen · viñeta · 959423107</p></figcaption>
+      </figure></li>
+      <li class="pieza"><figure>
+        <img src="images/obras/vitrina_kmeans-800.webp" width="800" height="450" loading="lazy" alt="El pez sierra en seis colores planos de la escala magma.">
+        <figcaption class="ficha"><p class="ficha-titulo">Vitrina en k-means</p><p>La vitrina clasificada en seis clases, de oscura a clara, con magma.</p><p class="ficha-datos">kmeans 6 · magma · mayoría 3 × 3</p></figcaption>
+      </figure></li>
+      <li class="pieza"><figure>
+        <img src="images/obras/cuatricromia-800.webp" width="800" height="450" loading="lazy" alt="Collage a color: cielo, una alberca turquesa, una catarina, una mariposa y una flor blanca sobre papel.">
+        <figcaption class="ficha"><p class="ficha-titulo">Cuatricromía</p><p>Collage a color sin recolorear, la base de las cuatro planchas.</p><p class="ficha-datos">recolor none · scatter · 254619158</p></figcaption>
+      </figure></li>
+      <li class="pieza"><figure>
+        <img src="images/obras/campus_kmeans-800.webp" width="800" height="450" loading="lazy" alt="Insectos y plantas reducidos a seis colores planos de viridis, del morado oscuro al amarillo.">
+        <figcaption class="ficha"><p class="ficha-titulo">Campus en k-means</p><p>Insectos y plantas del campus, clasificados en seis clases y pintados con viridis.</p><p class="ficha-datos">kmeans 6 · viridis · 520953710</p></figcaption>
+      </figure></li>
+      <li class="pieza"><figure>
+        <img src="images/obras/alineada-800.webp" width="800" height="450" loading="lazy" alt="Una banda de fotos pequeñas en tinta, encajadas como en un librero, con un pez sierra grande y papel vacío arriba y abajo.">
+        <figcaption class="ficha"><p class="ficha-titulo">Alineada</p><p>Empaquetado tipo estantería: cada pieza toca a sus vecinas, sin solaparse.</p><p class="ficha-datos">layout align · multiply · 246884557</p></figcaption>
+      </figure></li>
+      <li class="pieza"><figure>
+        <img src="images/obras/reticula-800.webp" width="800" height="450" loading="lazy" alt="Retícula de piezas de museo en rojo sobre un degradado oscuro, giradas en múltiplos de noventa grados.">
+        <figcaption class="ficha"><p class="ficha-titulo">Retícula</p><p>Cuadrícula con giros en 90°, duotono en rojo sobre degradado oscuro.</p><p class="ficha-datos">layout grid · duotone · 35290012</p></figcaption>
+      </figure></li>
+    </ul>
+    <div class="coleccion-nav">
+      <button type="button" data-dir="-1">← anterior</button>
+      <button type="button" data-dir="1">siguiente →</button>
     </div>
   </div>
 </section>
@@ -718,12 +1234,24 @@
             <dd>Cualquier color puede volverse transparente, y de ahí sale la polaridad de tinta sobre papel o de luz sobre oscuridad.</dd>
           </li>
           <li>
-            <dt>Mosaico y repetición</dt>
-            <dd>Repetición por proporciones con espejado y giro acumulado, distinto del mosaico que llena un área sin solaparse.</dd>
+            <dt>Colormaps y k-means</dt>
+            <dd>Repinta por brillo con inferno, magma, viridis o un degradado propio, o clasifica la imagen en N colores con k-means, como las herramientas ráster de un SIG.</dd>
           </li>
           <li>
-            <dt>Figuras y texto generados</dt>
+            <dt>Canales y tintas</dt>
+            <dd>Ganancia y desplazamiento por canal de luz (r, g, b) o por tinta (c, m, y, k), con separación de negro real.</dd>
+          </li>
+          <li>
+            <dt>Figuras isométricas</dt>
+            <dd>Cubo, escalera, cruz, marco y el triángulo de Penrose, pintados con un gris fijo por cara para que el recoloreado decida los colores.</dd>
+          </li>
+          <li>
+            <dt>Figuras y texto</dt>
             <dd>Rect, circle, triangle, diamond, polygon; y texto con fuente empaquetada, sin depender de lo que tenga instalado el sistema.</dd>
+          </li>
+          <li>
+            <dt>Mosaico y repetición</dt>
+            <dd>Repetición por proporciones con espejado y giro acumulado, distinto del mosaico que llena un área sin solaparse.</dd>
           </li>
           <li>
             <dt>Manchas de verdad</dt>
@@ -734,8 +1262,8 @@
             <dd>Empaquetado tipo estantería con skyline bottom-left: cada pieza toca a sus vecinas, sin solaparse.</dd>
           </li>
           <li>
-            <dt>Selección por pool</dt>
-            <dd>Una capa puede tomar su fuente de varias candidatas, sorteadas ponderando qué tan bien calzan el hueco y qué tan oscuro saldría el recorte.</dd>
+            <dt>Editor visual</dt>
+            <dd>Una interfaz en React sobre el mismo motor: capas a mano, vista previa, exportar con su JSON y una pestaña para recolorear un wallpaper ya hecho.</dd>
           </li>
           <li>
             <dt>Reproducible</dt>
@@ -750,7 +1278,7 @@
             <span class="step-number">1</span>
             <div>
               <h3>Instala Pillow</h3>
-              <p>Es la única dependencia.</p>
+              <p>Es la única dependencia del motor.</p>
               <pre>pip install -r requirements.txt</pre>
             </div>
           </div>
@@ -769,11 +1297,21 @@
               <p>O edita <code class="inline">CONFIG</code> dentro de <code class="inline">main.py</code> y corre <code class="inline">python main.py</code> sin más.</p>
             </div>
           </div>
+          <div class="step">
+            <span class="step-number">4</span>
+            <div>
+              <h3>O abre el editor</h3>
+              <p>La API en FastAPI y el frontend en Vite, cada uno en su terminal:</p>
+              <pre>pip install -r api/requirements.txt
+uvicorn api.main:app --reload --port 8030
+cd frontend &amp;&amp; npm install &amp;&amp; npm run dev</pre>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="panel panel-dark" id="panel-usage" role="tabpanel" aria-labelledby="tab-usage" hidden>
-        <p class="panel-intro">Además de <code class="inline">CONFIG</code> en <code class="inline">main.py</code>, Proun lee especificaciones completas en JSON con <code class="inline">--spec</code>. Es la misma estructura de datos en los dos casos; el JSON solo evita abrir un editor de Python. Los tres viven en <code class="inline">json/</code>.</p>
+        <p class="panel-intro">Además de <code class="inline">CONFIG</code> en <code class="inline">main.py</code>, Proun lee especificaciones completas en JSON con <code class="inline">--spec</code>. Es la misma estructura de datos en los dos casos; el JSON solo evita abrir un editor de Python. Viven en <code class="inline">json/</code>, y el editor exporta las suyas en el mismo formato.</p>
         <dl class="config-list">
           <div class="config-item">
             <code>json/exp.json</code>
@@ -784,7 +1322,11 @@
             <p>La receta completa que reconstruye el fondo de referencia: manchas reales, radiografías, cianotipos, el bloque alineado.</p>
           </div>
           <div class="config-item">
-            <code>json/proun_ss4.json</code>
+            <code>json/penrose.json</code>
+            <p>Figuras isométricas con colores por cara y fotos en tinta: la primera obra de la sala clara.</p>
+          </div>
+          <div class="config-item">
+            <code>json/ss4.json</code>
             <p>Una receta con la semilla fija: siempre reproduce el mismo wallpaper, byte por byte.</p>
           </div>
         </dl>
@@ -802,6 +1344,7 @@
       </div>
   </div>
 </section>
+</main>
 
 <footer>
   <div class="wrap">
@@ -817,25 +1360,23 @@
 <script type="module">
   import { animate, inView, scroll } from "https://cdn.jsdelivr.net/npm/motion@11/+esm";
 
-  // El pin del hero (sticky de tres pantallas) solo se activa si esta
-  // línea llega a correr, es decir, si el import de arriba tuvo éxito. Sin
-  // esto, .hero-pin-wrap no crece y header no se fija: todo se comporta
-  // como un bloque normal de una pantalla, igual que antes.
-  document.documentElement.classList.add("js-pin");
+  // Todo lo de abajo corre solo si el import tuvo éxito. Cada clase que
+  // cambia el acomodo (js-pin, js-intro, js-wipe, js-registro) se agrega
+  // aquí, nunca en el HTML: si el CDN falla, la página queda en su estado
+  // inerte por CSS (hero de una pantalla, par lado a lado, políptico 2 x 2).
+  const root = document.documentElement;
+  root.classList.add("js-pin");
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const clamp01 = (x) => Math.min(1, Math.max(0, x));
+  const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
 
-  // --- intro, en dos tiempos, 50% más lento que la primera versión. Las
-  // puertas naranjas ya están cerradas desde el arranque (visibles de
-  // inmediato, seguro porque solo pasa si el import tuvo éxito). Encima,
-  // una línea negra crece desde el centro, de forma errante, pero ya no
-  // necesita tocar los bordes: se detiene al 90% de la altura, dejando un
-  // 5% de margen arriba y abajo. Ahí se oculta, y las puertas auxiliares
-  // (del tamaño exacto de ese margen) se abren junto con las laterales, al
-  // mismo tiempo y con la misma duración: las cuatro terminan a la vez.
-  // animate() se llama en el mismo golpe síncrono que agrega la clase, así
-  // que una vez que arranca, el motor nativo termina cada tramo aunque
-  // algo después falle.
+  // --- intro. Las puertas rojas ya están cerradas desde el arranque. Una
+  // línea negra crece desde el centro, de forma errante, hasta el 90% de la
+  // altura; ahí se oculta y las cuatro puertas se abren a la vez. animate()
+  // se llama en el mismo golpe síncrono que agrega la clase, así que una
+  // vez que arranca, el motor nativo termina cada tramo aunque algo después
+  // falle.
   const intro = document.getElementById("page-intro");
   const introLine = document.querySelector(".intro-line");
   const introLeft = document.querySelector(".intro-left");
@@ -846,7 +1387,7 @@
     if (reduced) {
       intro.style.display = "none";
     } else {
-      document.documentElement.classList.add("js-intro");
+      root.classList.add("js-intro");
       (async () => {
         await animate(
           introLine,
@@ -855,15 +1396,12 @@
           { duration: 0.9, easing: "ease-out" }
         ).finished;
         introLine.style.display = "none";
+        const puerta = { duration: 0.9, easing: [0.76, 0, 0.24, 1] };
         await Promise.all([
-          animate(introCapTop, { y: ["0%", "-100%"] },
-                 { duration: 0.9, easing: [0.76, 0, 0.24, 1] }).finished,
-          animate(introCapBottom, { y: ["0%", "100%"] },
-                 { duration: 0.9, easing: [0.76, 0, 0.24, 1] }).finished,
-          animate(introLeft, { x: ["0%", "-100%"] },
-                 { duration: 0.9, easing: [0.76, 0, 0.24, 1] }).finished,
-          animate(introRight, { x: ["0%", "100%"] },
-                 { duration: 0.9, easing: [0.76, 0, 0.24, 1] }).finished,
+          animate(introCapTop, { y: ["0%", "-100%"] }, puerta).finished,
+          animate(introCapBottom, { y: ["0%", "100%"] }, puerta).finished,
+          animate(introLeft, { x: ["0%", "-100%"] }, puerta).finished,
+          animate(introRight, { x: ["0%", "100%"] }, puerta).finished,
         ]);
         intro.style.display = "none";
       })();
@@ -872,48 +1410,91 @@
 
   // --- hero: tres fases sobre las tres pantallas de .hero-pin-wrap.
   // 0 a 0.25: el título se desvanece hacia arriba y la imagen se desenfoca.
-  // 0.25 a 0.75 (el doble de la rampa anterior): todo se sostiene quieto.
-  // 0.75 a 1: la imagen se aleja un poco (escala hacia abajo) antes de que
-  // el header por fin suelte el scroll y dé paso al resto de la página.
+  // 0.25 a 0.75: todo se sostiene quieto.
+  // 0.75 a 1: la imagen se aleja un poco antes de soltar el scroll.
   const heroImg = document.querySelector(".hero-media img");
   const heroText = document.querySelector(".hero-text");
   const heroPinWrap = document.getElementById("hero-pin-wrap");
   if (heroImg && heroText && heroPinWrap && !reduced) {
     scroll(
       (progress) => {
-        let desvanece, mueveY, blur, escala;
-        if (progress <= 0.25) {
-          const t = progress / 0.25;
-          desvanece = 1 - t;
-          mueveY = t * -70;
-          blur = t * 9;
-          escala = 1;
-        } else if (progress <= 0.75) {
-          desvanece = 0;
-          mueveY = -70;
-          blur = 9;
-          escala = 1;
-        } else {
-          const t = (progress - 0.75) / 0.25;
-          desvanece = 0;
-          mueveY = -70;
-          blur = 9;
-          escala = 1 - t * 0.08;
-        }
-        heroText.style.opacity = desvanece;
-        heroText.style.transform = `translateY(${mueveY}px)`;
-        heroImg.style.filter = `grayscale(0.15) blur(${blur}px)`;
-        heroImg.style.transform = `scale(${escala})`;
+        const t = clamp01(progress / 0.25);
+        const aleja = clamp01((progress - 0.75) / 0.25);
+        heroText.style.opacity = 1 - t;
+        heroText.style.transform = `translateY(${t * -70}px)`;
+        heroImg.style.filter = `blur(${t * 9}px)`;
+        heroImg.style.transform = `scale(${1 - aleja * 0.08})`;
       },
       { target: heroPinWrap, offset: ["start start", "end start"] }
     );
   }
 
-  // --- tabs: la cortina solo se anima al cambiar de tab, no al hacer
-  // scroll. Se cierra, se cambia el panel visible por debajo mientras está
-  // tapado, y se vuelve a abrir. Por defecto los blades están en scaleY(0)
-  // (CSS más arriba), así que si este script no llega a correr, los tres
-  // paneles simplemente no se pueden cambiar, pero nada queda tapado.
+  // --- sala clara: cada obra se cuelga al entrar, sube un poco y aparece.
+  // Antes de entrar ya es visible (CSS), solo que fuera de pantalla.
+  if (!reduced) {
+    document.querySelectorAll(".colgar").forEach((obra) => {
+      inView(obra, () => {
+        animate(obra, { opacity: [0, 1], y: [28, 0] },
+               { duration: 0.7, easing: [0.22, 1, 0.36, 1] });
+      }, { amount: 0.25 });
+    });
+  }
+
+  // --- sala oscura: la vitrina en k-means entra sobre la original detrás
+  // de una línea roja, mientras el marco cruza la pantalla.
+  const par = document.querySelector(".par");
+  const parB = par && par.querySelector(".par-b");
+  const parLinea = par && par.querySelector(".par-linea");
+  if (par && parB && parLinea && !reduced) {
+    root.classList.add("js-wipe");
+    const pintar = (progress) => {
+      const t = easeInOut(clamp01((progress - 0.3) / 0.4));
+      parB.style.clipPath = `inset(0 ${(1 - t) * 100}% 0 0)`;
+      parLinea.style.left = `${t * 100}%`;
+      parLinea.style.opacity = t > 0 && t < 1 ? 1 : 0;
+    };
+    pintar(0);
+    scroll(pintar, { target: par.querySelector(".par-a"), offset: ["start end", "end start"] });
+  }
+
+  // --- cuatro tintas: las planchas parten en 2 x 2 y viajan al centro
+  // escalando al doble, hasta quedar en registro. translate en % es del
+  // tamaño de la propia plancha (medio lienzo): moverla 50% la lleva al
+  // centro, y scale(2) la hace ocupar el lienzo entero.
+  const registro = document.querySelector(".registro");
+  const planchas = registro ? [...registro.querySelectorAll(".plancha")] : [];
+  if (registro && planchas.length === 4 && !reduced) {
+    root.classList.add("js-registro");
+    scroll(
+      (progress) => {
+        const t = easeInOut(clamp01((progress - 0.12) / 0.62));
+        planchas.forEach((plancha, i) => {
+          const dx = (1 - 2 * (i % 2)) * 50 * t;
+          const dy = (1 - 2 * Math.floor(i / 2)) * 50 * t;
+          plancha.style.transform = `translate(${dx}%, ${dy}%) scale(${0.94 + 1.06 * t})`;
+        });
+        registro.style.setProperty("--t", t.toFixed(3));
+      },
+      { target: registro, offset: ["start start", "end end"] }
+    );
+  }
+
+  // --- colección: los botones avanzan una pieza. El desplazamiento en sí
+  // es nativo (scroll-snap), así que sin JS se recorre igual.
+  const coleccion = document.querySelector(".coleccion");
+  document.querySelectorAll(".coleccion-nav button").forEach((boton) => {
+    boton.addEventListener("click", () => {
+      if (!coleccion) return;
+      const pieza = coleccion.querySelector(".pieza");
+      const paso = pieza ? pieza.getBoundingClientRect().width + 28 : coleccion.clientWidth;
+      coleccion.scrollBy({ left: paso * Number(boton.dataset.dir), behavior: reduced ? "auto" : "smooth" });
+    });
+  });
+
+  // --- tabs: la cortina solo se anima al cambiar de tab. Se cierra, se
+  // cambia el panel visible por debajo y se vuelve a abrir. Por defecto los
+  // blades están en scaleY(0), así que si este script no corre los paneles
+  // no se pueden cambiar, pero nada queda tapado.
   const tabsEl = document.querySelector(".tabs");
   const tabs = [...document.querySelectorAll(".tab")];
   const panels = [...document.querySelectorAll(".panel")];
@@ -929,7 +1510,7 @@
     if (!indicator || !tabsEl || !tab) return;
     const rectTabs = tabsEl.getBoundingClientRect();
     const rectTab = tab.getBoundingClientRect();
-    const left = rectTab.left - rectTabs.left;
+    const left = rectTab.left - rectTabs.left + tabsEl.scrollLeft;
     const width = rectTab.width;
     if (animar && !reduced) {
       animate(indicator, { left: `${left}px`, width: `${width}px` },
@@ -940,9 +1521,8 @@
     }
   }
 
-  // El stage se fija a la altura del panel más alto de los tres, así la
-  // cortina siempre cubre el mismo rectángulo sin importar cuál tab esté
-  // activa: antes cambiaba de tamaño en cada cambio y se veía tosco.
+  // El stage se fija a la altura del panel más alto, así la cortina
+  // siempre cubre el mismo rectángulo sin importar cuál tab esté activa.
   function medirAlturaStage() {
     if (!stage) return;
     let maxima = 0;
@@ -987,6 +1567,7 @@
     panels[indice].hidden = false;
     tabs[indice].setAttribute("aria-selected", "true");
     tabs[indice].tabIndex = 0;
+    tabs[indice].focus();
     moverIndicador(tabs[indice], true);
     activo = indice;
 
@@ -1007,33 +1588,6 @@
       if (e.key === "ArrowLeft") irA((i - 1 + tabs.length) % tabs.length);
     });
   });
-
-  // --- galería: un solo momento de animación, no una entrada genérica por
-  // sección. Se ensambla como un collage, que es lo que la herramienta hace.
-  const figures = document.querySelectorAll(".gallery figure");
-
-  if (!reduced && figures.length) {
-    inView(".gallery", () => {
-      figures.forEach((fig, i) => {
-        const rest = parseFloat(fig.dataset.rotate || "0");
-        animate(
-          fig,
-          { opacity: [0, 1], y: [26, 0], rotate: [rest * 2.6, rest] },
-          { duration: 0.65, delay: i * 0.1, easing: [0.22, 1, 0.36, 1] }
-        );
-      });
-    }, { amount: 0.35 });
-
-    figures.forEach((fig) => {
-      const rest = parseFloat(fig.dataset.rotate || "0");
-      fig.addEventListener("mouseenter", () => {
-        animate(fig, { rotate: 0, scale: 1.02 }, { duration: 0.3, easing: "ease-out" });
-      });
-      fig.addEventListener("mouseleave", () => {
-        animate(fig, { rotate: rest, scale: 1 }, { duration: 0.35, easing: "ease-out" });
-      });
-    });
-  }
 </script>
 </body>
 </html>

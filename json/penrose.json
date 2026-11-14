@@ -1,0 +1,142 @@
+{
+  "_nota": "Obra de docs/index.html. Figuras isométricas a tres colores por cara (stops: derecha, izquierda, arriba) sobre fotos de museo en tinta. Penrose al centro, siempre encima (z).",
+  "output": "wallpapers/penrose",
+  "resolutions": [
+    "1920x1080"
+  ],
+  "colors": [
+    "#d94f3d"
+  ],
+  "seeds": [
+    940143726
+  ],
+  "background": {
+    "solid": "#f2efe8",
+    "stain": {
+      "amount": 0.3,
+      "scale": 0.5,
+      "color": "#e3ddd0"
+    }
+  },
+  "layers": {
+    "min": 8,
+    "max": 8
+  },
+  "layout": {
+    "mode": "scatter",
+    "bleed": 0.08,
+    "size": [
+      0.25,
+      0.6
+    ]
+  },
+  "finish": {
+    "grain": 0.035
+  },
+  "defaults": {
+    "rotate": "random",
+    "tones": {
+      "normalize": true,
+      "cutoff": 2,
+      "dominant": "light",
+      "gamma": 0.8
+    },
+    "transparent": {
+      "color": "light",
+      "tolerance": 0.02,
+      "softness": 0.4
+    },
+    "recolor": {
+      "mode": "duotone",
+      "shadow": "#141210",
+      "highlight": "#8a8078"
+    },
+    "blend": "multiply"
+  },
+  "sources": [
+    {
+      "shape": {
+        "kind": "iso",
+        "figure": "penrose",
+        "size": 6
+      },
+      "recolor": {
+        "mode": "colormap",
+        "stops": [
+          "#141210",
+          "#d94f3d",
+          "#e2dccf"
+        ]
+      },
+      "tones": null,
+      "rotate": null,
+      "z": 10,
+      "resize": {
+        "size": [
+          0.5,
+          0.5
+        ]
+      },
+      "position": [
+        0.5,
+        0.5
+      ],
+      "anchor": "center"
+    },
+    {
+      "shape": {
+        "kind": "iso",
+        "figure": "escalera",
+        "size": 5
+      },
+      "recolor": {
+        "mode": "colormap",
+        "stops": [
+          "#141210",
+          "#d94f3d",
+          "#e2dccf"
+        ]
+      },
+      "tones": null,
+      "rotate": null
+    },
+    {
+      "shape": {
+        "kind": "iso",
+        "figure": "cubo",
+        "size": 1
+      },
+      "recolor": {
+        "mode": "colormap",
+        "stops": [
+          "#141210",
+          "#d94f3d",
+          "#e2dccf"
+        ]
+      },
+      "tones": null,
+      "rotate": null
+    },
+    {
+      "shape": {
+        "kind": "iso",
+        "figure": "marco",
+        "size": 4
+      },
+      "recolor": {
+        "mode": "colormap",
+        "stops": [
+          "#141210",
+          "#d94f3d",
+          "#e2dccf"
+        ]
+      },
+      "tones": null,
+      "rotate": null
+    },
+    "../fuentes/Museos/golden.JPG",
+    "../fuentes/Museos/squares.JPG",
+    "../fuentes/Museos/tests.JPG",
+    "../fuentes/Museos/small.JPG"
+  ]
+}

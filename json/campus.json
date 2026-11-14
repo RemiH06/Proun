@@ -1,0 +1,41 @@
+{
+  "_nota": "Obra de docs/index.html. Collage a color de Campus; en la sala se exhibe ya clasificado con k-means (6 clases, viridis).",
+  "output": "wallpapers/campus",
+  "resolutions": [
+    "1920x1080"
+  ],
+  "colors": [
+    "#d94f3d"
+  ],
+  "seeds": [
+    520953710
+  ],
+  "background": {
+    "solid": "#f2efe8"
+  },
+  "layers": {
+    "min": 8,
+    "max": 12
+  },
+  "layout": {
+    "mode": "scatter",
+    "bleed": 0.12,
+    "size": [
+      0.25,
+      0.6
+    ]
+  },
+  "finish": {
+    "grain": 0.02
+  },
+  "defaults": {
+    "rotate": "random",
+    "tones": null,
+    "recolor": {
+      "mode": "none"
+    }
+  },
+  "sources": [
+    "../fuentes/Campus/*.png"
+  ]
+}
