@@ -97,6 +97,10 @@ Commit sugerido:
      con `node --test worker/docs.test.mjs` y probado contra Pages en
      vivo. Falta: Remi lo crea en el panel (Workers, pegar `docs.js`,
      ruta `proun.remlam.dev/docs*`) y se verifica desde fuera.
+  4c. Portada: el hero vuelve a la imagen de antes (`proun_ss1.png`,
+     recuperada de `ff3f305`) como `docs/images/portada-{800,1600}.webp`,
+     encuadre `50% 30%`. Se queda el velo de 0.64 (contraste del
+     subtítulo). La Penrose sigue en la primera sala.
   5. Texto de ayuda de `SourceFolderPicker`: dice "relativa o absoluta";
      publicado solo valen `fuentes/` y `wallpapers/`.
   6. Canonical y `og:` (con `images/obras/penrose-1600.webp`) en la
