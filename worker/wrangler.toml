@@ -3,5 +3,8 @@
 name = "proun-docs"
 main = "docs.js"
 compatibility_date = "2026-10-01"
+# Sin direcciones *.workers.dev (ni la de producción ni las de cada versión):
+# la landing solo vive en proun.remlam.dev/docs.
 workers_dev = false
+preview_urls = false
 routes = [{ pattern = "proun.remlam.dev/docs*", zone_name = "remlam.dev" }]
