@@ -15,6 +15,7 @@ from api.cache import cache
 from api.main import app
 from api.paths import PROJECT_ROOT, resolve_sources_path
 from api.routes_render import _build_spec, _sin_explosion_de_mosaico
+from api.routes_sources import usadas_en
 from api.schemas import LayerSpec, PreviewRequest
 from proun import compose, layout, loading
 from proun import spec as spec_module
@@ -64,6 +65,47 @@ def cuerpo(**extra):
         "seed": 424242,
         **extra,
     }
+
+
+class ImagenesUsadas(unittest.TestCase):
+    """Las imágenes que ya aparecen en los JSON de wallpapers/: ver
+    api/routes_sources.py::usadas_en."""
+
+    def setUp(self):
+        self.carpeta = RAIZ / "usadas_wallpapers"
+        shutil.rmtree(self.carpeta, ignore_errors=True)
+        (self.carpeta / "1920x1080" / "atardecer").mkdir(parents=True)
+
+    def escribir(self, ruta, contenido):
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(contenido, encoding="utf-8")
+
+    def test_lee_las_src_de_las_capas(self):
+        self.escribir(self.carpeta / "1920x1080" / "atardecer" / "atardecer.json", json.dumps({
+            "sources": [{"src": str(ARCHIVOS[0])}, {"shape": "circle"}, {"src": str(ARCHIVOS[1])}],
+        }))
+        self.assertEqual(usadas_en(self.carpeta),
+                         sorted(str(Path(a).resolve()) for a in ARCHIVOS[:2]))
+
+    def test_salta_json_roto_y_sin_sources(self):
+        self.escribir(self.carpeta / "roto.json", "{no es json")
+        self.escribir(self.carpeta / "sin_capas.json", json.dumps({"seeds": [1]}))
+        self.escribir(self.carpeta / "1920x1080" / "bueno.json", json.dumps(
+            {"sources": [{"src": str(ARCHIVOS[2])}]}))
+        self.assertEqual(usadas_en(self.carpeta), [str(Path(ARCHIVOS[2]).resolve())])
+
+    def test_ignora_archivos_que_no_son_json(self):
+        self.escribir(self.carpeta / "nota.txt", json.dumps(
+            {"sources": [{"src": str(ARCHIVOS[3])}]}))
+        self.assertEqual(usadas_en(self.carpeta), [])
+
+    def test_carpeta_inexistente_da_lista_vacia(self):
+        self.assertEqual(usadas_en(RAIZ / "no_existe_wallpapers"), [])
+
+    def test_ruta_de_la_api_responde_con_paths(self):
+        resp = client.get("/api/sources/used")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsInstance(resp.json()["paths"], list)
 
 
 class RutasDeFuentes(unittest.TestCase):
@@ -513,6 +555,45 @@ class Recolor(unittest.TestCase):
         self.assertEqual(destino, origen.with_stem("negativo_invertido"))
         self.assertTrue(destino.is_file())
 
+    def test_preview_kmeans_con_y_sin_degradado(self):
+        medios = client.post("/api/recolor/preview",
+                             json={"path": str(WALLPAPER), "mode": "kmeans", "colors": 4})
+        pintado = client.post("/api/recolor/preview", json={
+            "path": str(WALLPAPER), "mode": "kmeans", "colors": 4, "name": "viridis",
+        })
+        self.assertEqual(medios.status_code, 200)
+        self.assertEqual(pintado.status_code, 200)
+        self.assertNotEqual(medios.content, pintado.content)
+        colores = Image.open(io.BytesIO(medios.content)).convert("RGB").getcolors()
+        self.assertLessEqual(len(colores), 4)
+
+    def test_preview_kmeans_invalido_da_400(self):
+        resp = client.post("/api/recolor/preview",
+                           json={"path": str(WALLPAPER), "mode": "kmeans", "smooth": 4})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("impar", resp.json()["detail"])
+
+    def test_export_kmeans_y_channels_dan_su_sufijo(self):
+        origen = RAIZ / "raster.png"
+        Image.linear_gradient("L").resize((32, 32)).convert("RGB").save(origen)
+        for cuerpo_extra, sufijo in (
+            ({"mode": "kmeans", "colors": 5}, "kmeans5"),
+            ({"mode": "kmeans", "colors": 5, "name": "magma"}, "kmeans5_magma"),
+            ({"mode": "channels", "channels": {"c": [1.2, 0]}}, "canales"),
+        ):
+            with self.subTest(sufijo=sufijo):
+                resp = client.post("/api/recolor/export", json={"path": str(origen), **cuerpo_extra})
+                self.assertEqual(resp.status_code, 200)
+                destino = Path(resp.headers["x-export-path"])
+                self.assertEqual(destino, origen.with_stem(f"raster_{sufijo}"))
+                self.assertTrue(destino.is_file())
+
+    def test_preview_channels_mezclados_da_400(self):
+        resp = client.post("/api/recolor/preview", json={
+            "path": str(WALLPAPER), "mode": "channels", "channels": {"r": 1, "k": 1},
+        })
+        self.assertEqual(resp.status_code, 400)
+
     def test_preview_mode_none_no_recolorea(self):
         # Sin escala de color: el resultado tiene que ser igual al original
         # (más allá de rotar/redimensionar, que acá no se pide).
@@ -530,6 +611,15 @@ class Recolor(unittest.TestCase):
         imagen = Image.open(io.BytesIO(resp.content))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(imagen.size, (60, 90))
+
+    def test_export_invert_value_da_sufijo_tonos_invertidos(self):
+        origen = RAIZ / "foto.png"
+        Image.linear_gradient("L").resize((32, 32)).convert("RGB").save(origen)
+        resp = client.post("/api/recolor/export", json={"path": str(origen), "mode": "invert_value"})
+        self.assertEqual(resp.status_code, 200)
+        destino = Path(resp.headers["x-export-path"])
+        self.assertEqual(destino, origen.with_stem("foto_tonos_invertidos"))
+        self.assertTrue(destino.is_file())
 
     def test_export_mode_none_da_sufijo_redimensionado(self):
         origen = RAIZ / "sin_color.png"

@@ -114,6 +114,35 @@ class CLI(unittest.TestCase):
         codigo = recolorear.main([str(origen), "--name", "arcoiris"])
         self.assertEqual(codigo, 2)
 
+    def test_kmeans_sin_name_conserva_colores_medios(self):
+        origen = RAIZ / "clases.png"
+        duotono_azul(32, 32).save(origen)
+        codigo = recolorear.main([str(origen), "--kmeans", "3", "--smooth", "3"])
+        self.assertEqual(codigo, 0)
+        with Image.open(RAIZ / "clases_kmeans3.png") as salida:
+            colores = salida.convert("RGB").getcolors()
+        self.assertLessEqual(len(colores), 3)
+        # Siguen siendo azules: nadie las pintó con inferno.
+        self.assertTrue(all(r == 0 and g == 0 for _, (r, g, b) in colores))
+
+    def test_kmeans_con_name_pinta_las_clases(self):
+        origen = RAIZ / "clases_viridis.png"
+        duotono_azul(32, 32).save(origen)
+        codigo = recolorear.main([str(origen), "--kmeans", "4", "--name", "viridis"])
+        self.assertEqual(codigo, 0)
+        self.assertTrue((RAIZ / "clases_viridis_kmeans4_viridis.png").is_file())
+
+    def test_kmeans_invalido(self):
+        origen = RAIZ / "kmalo.png"
+        duotono_azul(8, 8).save(origen)
+        self.assertEqual(recolorear.main([str(origen), "--kmeans", "1"]), 2)
+
+    def test_channels_cmyk(self):
+        salida = recolorear.recolorear(duotono_azul(), mode="channels", channels={"k": 0})
+        # Sin plancha de negro, el azul casi negro del extremo oscuro queda
+        # en azul puro: lo oscuro era K, el matiz eran las tintas C y M.
+        self.assertEqual(salida.getpixel((0, 0))[:3], (0, 0, 255))
+
 
 if __name__ == "__main__":
     unittest.main()

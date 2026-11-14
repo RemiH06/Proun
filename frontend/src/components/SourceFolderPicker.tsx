@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { listSources, thumbnailUrl, type SourceImage } from '../api/client'
+import {
+  listSources,
+  listUsedSources,
+  thumbnailUrl,
+  type SourceImage,
+} from '../api/client'
 
 type Props = {
   value: string
@@ -14,6 +19,8 @@ export function SourceFolderPicker({ value, onChange, selectedPaths, onToggle }:
   const [resolvedPath, setResolvedPath] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [ocultarUsadas, setOcultarUsadas] = useState(false)
+  const [usadas, setUsadas] = useState<Set<string>>(new Set())
 
   async function buscar() {
     setLoading(true)
@@ -23,6 +30,7 @@ export function SourceFolderPicker({ value, onChange, selectedPaths, onToggle }:
       onChange(draft)
       setImages(resultado.images)
       setResolvedPath(resultado.path)
+      setUsadas(await listUsedSources())
     } catch (e) {
       setError(e instanceof Error ? e.message : 'no se pudo leer la carpeta')
       setImages([])
@@ -31,6 +39,9 @@ export function SourceFolderPicker({ value, onChange, selectedPaths, onToggle }:
       setLoading(false)
     }
   }
+
+  const visibles = ocultarUsadas ? images.filter((img) => !usadas.has(img.path)) : images
+  const ocultas = images.length - visibles.length
 
   return (
     <section className="panel">
@@ -63,11 +74,20 @@ export function SourceFolderPicker({ value, onChange, selectedPaths, onToggle }:
       )}
       {images.length > 0 && (
         <>
+          <label className="muted">
+            <input
+              type="checkbox"
+              checked={ocultarUsadas}
+              onChange={(e) => setOcultarUsadas(e.target.checked)}
+            />{' '}
+            ocultar las ya usadas en wallpapers
+          </label>
           <p className="muted">
-            {images.length} imágenes encontradas, {selectedPaths.size} seleccionadas
+            {visibles.length} imágenes{ocultas > 0 ? ` (${ocultas} ocultas)` : ''},{' '}
+            {selectedPaths.size} seleccionadas
           </p>
           <div className="thumbs">
-            {images.map((img) => (
+            {visibles.map((img) => (
               <button
                 key={img.path}
                 type="button"

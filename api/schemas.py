@@ -91,8 +91,15 @@ class RecolorRequest(RecolorGeometry):
 
     path: str
     mode: str = "colormap"
-    name: str = "inferno"
+    # En "colormap" falta = inferno; en "kmeans" falta = cada clase con su
+    # color medio, con nombre = clases pintadas con ese degradado.
+    name: str | None = None
     stops: list[str] | None = None
+    # Solo "kmeans": cuántas clases y el tamaño del filtro de mayoría.
+    colors: int | None = None
+    smooth: int | None = None
+    # Solo "channels": {"c": [ganancia, desplazamiento], ...} o r/g/b.
+    channels: dict | None = None
 
 
 class RecolorAllRequest(RecolorGeometry):

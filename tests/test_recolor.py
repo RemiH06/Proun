@@ -133,6 +133,20 @@ class Colormap(unittest.TestCase):
                 self.assertEqual(negro.getpixel((0, 0))[:3], puntos[0])
                 self.assertEqual(blanco.getpixel((0, 0))[:3], puntos[-1])
 
+    def test_blanco_azul_va_de_blanco_a_azul(self):
+        azul = (59, 167, 255)
+        self.assertEqual(recolor.apply(plana(0), ROJO, {"mode": "colormap", "name": "blanco_azul"})
+                         .getpixel((0, 0))[:3], (255, 255, 255))
+        self.assertEqual(recolor.apply(plana(255), ROJO, {"mode": "colormap", "name": "blanco_azul"})
+                         .getpixel((0, 0))[:3], azul)
+
+    def test_negro_azul_va_de_negro_a_azul(self):
+        azul = (59, 167, 255)
+        self.assertEqual(recolor.apply(plana(0), ROJO, {"mode": "colormap", "name": "negro_azul"})
+                         .getpixel((0, 0))[:3], (0, 0, 0))
+        self.assertEqual(recolor.apply(plana(255), ROJO, {"mode": "colormap", "name": "negro_azul"})
+                         .getpixel((0, 0))[:3], azul)
+
     def test_es_el_degradado_por_defecto_si_no_se_da_name(self):
         con_name = recolor.apply(grises(), ROJO, {"mode": "colormap", "name": "inferno"})
         sin_name = recolor.apply(grises(), ROJO, {"mode": "colormap"})
@@ -162,6 +176,25 @@ class Colormap(unittest.TestCase):
     def test_stops_necesita_al_menos_dos_colores(self):
         with self.assertRaises(SpecError):
             recolor.apply(grises(), ROJO, {"mode": "colormap", "stops": ["#000000"]})
+
+
+class InvertirTonos(unittest.TestCase):
+    """`invert_value`: invierte la luminosidad pero conserva matiz y
+    saturación, a diferencia de `invert` (negativo por canal)."""
+
+    def test_claro_pasa_a_oscuro_y_al_revés(self):
+        self.assertEqual(recolor.apply(plana(255), ROJO, {"mode": "invert_value"}).getpixel((0, 0))[:3], (0, 0, 0))
+        self.assertEqual(recolor.apply(plana(0), ROJO, {"mode": "invert_value"}).getpixel((0, 0))[:3], (255, 255, 255))
+
+    def test_conserva_el_matiz_y_no_es_el_negativo(self):
+        color = Image.new("RGBA", (8, 8), (200, 100, 50, 255))
+        tonal = recolor.apply(color, ROJO, {"mode": "invert_value"}).getpixel((0, 0))[:3]
+        negativo = recolor.apply(color, ROJO, {"mode": "invert"}).getpixel((0, 0))[:3]
+        self.assertNotEqual(tonal, negativo)
+        r, g, b = tonal
+        self.assertGreater(r, g)
+        self.assertGreater(g, b)
+        self.assertLess(max(tonal), 200)
 
 
 class Invertir(unittest.TestCase):
@@ -276,6 +309,130 @@ class General(unittest.TestCase):
         # Ese trabajo se fue a ops/tones.
         with self.assertRaises(SpecError):
             recolor.apply(grises(), ROJO, {"mode": "grayscale"})
+
+
+def color(rgb, w=4, h=4):
+    return Image.new("RGBA", (w, h), rgb + (255,))
+
+
+def colorida(w=48, h=48):
+    """Una imagen con muchos matices y tonos distintos, no solo grises."""
+    base = Image.radial_gradient("L").resize((w, h))
+    return Image.merge("RGB", (base, base.rotate(90), base.rotate(45))).convert("RGBA")
+
+
+class CanalesCMYK(unittest.TestCase):
+    def cmyk(self, im, canales):
+        return recolor.apply(im, ROJO, {"mode": "channels", "channels": canales})
+
+    def test_sin_cambios_la_vuelta_es_exacta(self):
+        original = colorida()
+        salida = self.cmyk(original, {"c": 1, "m": [1, 0], "y": 1, "k": 1})
+        self.assertEqual(salida.tobytes(), original.tobytes())
+
+    def test_el_rojo_es_magenta_mas_amarillo(self):
+        self.assertEqual(self.cmyk(color((255, 0, 0)), {"m": 0}).getpixel((0, 0))[:3], (255, 255, 0))
+        self.assertEqual(self.cmyk(color((255, 0, 0)), {"y": 0}).getpixel((0, 0))[:3], (255, 0, 255))
+
+    def test_cian_absorbe_el_rojo(self):
+        # Blanco con toda la tinta cian da cian puro.
+        self.assertEqual(self.cmyk(color((255, 255, 255)), {"c": [1, 255]}).getpixel((0, 0))[:3],
+                         (0, 255, 255))
+
+    def test_k_es_lo_oscuro(self):
+        # Sin plancha de negro, un gris oscuro neutro sube hasta el blanco.
+        self.assertEqual(self.cmyk(color((40, 40, 40)), {"k": 0}).getpixel((0, 0))[:3],
+                         (255, 255, 255))
+        # Y el negro puro también, sin dividir entre cero.
+        self.assertEqual(self.cmyk(color((0, 0, 0)), {"k": 0}).getpixel((0, 0))[:3],
+                         (255, 255, 255))
+
+    def test_mas_negro_oscurece_sin_cambiar_el_matiz(self):
+        r, g, b = self.cmyk(color((200, 100, 50)), {"k": [1, 60]}).getpixel((0, 0))[:3]
+        self.assertLess(r, 200)
+        self.assertGreater(r, g)
+        self.assertGreater(g, b)
+
+    def test_satura_sin_desbordar(self):
+        r, g, b = self.cmyk(color((120, 80, 200)), {"c": 9, "m": [1, -999]}).getpixel((0, 0))[:3]
+        for v in (r, g, b):
+            self.assertTrue(0 <= v <= 255)
+
+    def test_conserva_el_alfa(self):
+        im = colorida()
+        im.putalpha(77)
+        self.assertEqual(self.cmyk(im, {"c": 1.5}).getchannel("A").getextrema(), (77, 77))
+
+    def test_no_mezcla_luz_con_tinta(self):
+        with self.assertRaises(SpecError):
+            self.cmyk(colorida(), {"r": 1, "c": 1})
+
+    def test_ganancia_no_numerica(self):
+        with self.assertRaises(SpecError):
+            self.cmyk(colorida(), {"c": ["mucho", 0]})
+
+
+class KMeans(unittest.TestCase):
+    def test_reduce_a_las_clases_pedidas(self):
+        salida = recolor.apply(colorida(), ROJO, {"mode": "kmeans", "colors": 4})
+        self.assertLessEqual(len(salida.convert("RGB").getcolors()), 4)
+
+    def test_seis_clases_por_defecto(self):
+        salida = recolor.apply(colorida(), ROJO, {"mode": "kmeans"})
+        self.assertLessEqual(len(salida.convert("RGB").getcolors()), 6)
+        self.assertGreater(len(salida.convert("RGB").getcolors()), 1)
+
+    def test_es_determinista(self):
+        a = recolor.apply(colorida(), ROJO, {"mode": "kmeans", "colors": 5, "smooth": 3})
+        b = recolor.apply(colorida(), ROJO, {"mode": "kmeans", "colors": 5, "smooth": 3})
+        self.assertEqual(a.tobytes(), b.tobytes())
+
+    def test_sin_degradado_conserva_colores_medios(self):
+        # Una imagen de dos colores planos da justo esos dos colores.
+        im = Image.new("RGBA", (8, 8), (200, 30, 30, 255))
+        im.paste((20, 40, 220, 255), (0, 0, 4, 8))
+        salida = recolor.apply(im, ROJO, {"mode": "kmeans", "colors": 2})
+        self.assertEqual({c for _, c in salida.convert("RGB").getcolors()},
+                         {(200, 30, 30), (20, 40, 220)})
+
+    def test_con_degradado_pinta_de_oscuro_a_claro(self):
+        im = Image.new("RGBA", (8, 8), (240, 240, 240, 255))
+        im.paste((10, 10, 10, 255), (0, 0, 4, 8))
+        salida = recolor.apply(im, ROJO, {"mode": "kmeans", "colors": 2,
+                                          "stops": ["#ff0000", "#0000ff"]})
+        self.assertEqual(salida.getpixel((0, 0))[:3], (255, 0, 0))
+        self.assertEqual(salida.getpixel((7, 0))[:3], (0, 0, 255))
+
+    def test_con_colormap_con_nombre(self):
+        salida = recolor.apply(colorida(), ROJO, {"mode": "kmeans", "colors": 3, "name": "viridis"})
+        usados = {c for _, c in salida.convert("RGB").getcolors()}
+        self.assertIn(recolor.COLORMAPS["viridis"][0], usados)
+        self.assertIn(recolor.COLORMAPS["viridis"][-1], usados)
+
+    def test_suavizado_quita_pixeles_sueltos(self):
+        im = Image.new("RGBA", (16, 16), (240, 240, 240, 255))
+        im.paste((10, 10, 10, 255), (0, 0, 8, 16))
+        im.putpixel((12, 8), (10, 10, 10, 255))
+        sin = recolor.apply(im, ROJO, {"mode": "kmeans", "colors": 2})
+        con = recolor.apply(im, ROJO, {"mode": "kmeans", "colors": 2, "smooth": 3})
+        self.assertNotEqual(sin.getpixel((12, 8)), sin.getpixel((13, 8)))
+        self.assertEqual(con.getpixel((12, 8)), con.getpixel((13, 8)))
+
+    def test_conserva_el_alfa(self):
+        im = colorida()
+        im.putalpha(90)
+        salida = recolor.apply(im, ROJO, {"mode": "kmeans"})
+        self.assertEqual(salida.getchannel("A").getextrema(), (90, 90))
+
+    def test_clases_fuera_de_rango(self):
+        for malo in (1, 33, 2.5, True, "6"):
+            with self.subTest(colors=malo), self.assertRaises(SpecError):
+                recolor.apply(colorida(), ROJO, {"mode": "kmeans", "colors": malo})
+
+    def test_suavizado_par_o_fuera_de_rango(self):
+        for malo in (2, 4, 17, -1):
+            with self.subTest(smooth=malo), self.assertRaises(SpecError):
+                recolor.apply(colorida(), ROJO, {"mode": "kmeans", "smooth": malo})
 
 
 if __name__ == "__main__":

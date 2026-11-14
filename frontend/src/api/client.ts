@@ -331,6 +331,13 @@ export async function fetchOptions(): Promise<Options> {
   return res.json()
 }
 
+export async function listUsedSources(): Promise<Set<string>> {
+  const res = await fetch('/api/sources/used')
+  if (!res.ok) throw new Error(await readError(res))
+  const datos: { paths: string[] } = await res.json()
+  return new Set(datos.paths)
+}
+
 export async function listSources(path: string): Promise<SourceList> {
   const res = await fetch(`/api/sources?path=${encodeURIComponent(path)}`)
   if (!res.ok) throw new Error(await readError(res))
@@ -368,13 +375,24 @@ export async function exportImage(
 // negativo, sin pasar por layers/compose: ver api/routes_recolor.py y
 // recolorear.py. angle/flipH/flipV/resolution son opcionales: rotan/
 // voltean y encajan en otra resolución antes de recolorear.
-export type RecolorMode = 'colormap' | 'invert' | 'none'
+export type RecolorMode = 'colormap' | 'kmeans' | 'channels' | 'invert' | 'invert_value' | 'none'
+
+// Clasificación k-means (recolor.py::_kmeans): `name` null = cada clase con
+// su color medio; con nombre = clases pintadas con ese colormap, de oscura
+// a clara. `smooth` 0 = sin filtro de mayoría, si no un impar (3, 5, 7).
+export type KMeansParams = { colors: number; smooth: number; name: string | null }
+
+// Ganancia y desplazamiento por canal (recolor.py::_channels/_cmyk): todas
+// las claves de un solo modelo, r/g/b (luz) o c/m/y/k (tinta).
+export type ChannelGains = Record<string, [number, number]>
 
 export type RecolorParams = {
   path: string
   mode?: RecolorMode
   name: string
   stops?: string[]
+  kmeans?: KMeansParams
+  channels?: ChannelGains
   angle?: 0 | 90 | 180 | 270
   flipH?: boolean
   flipV?: boolean
@@ -389,8 +407,14 @@ function recolorBody(p: RecolorParams) {
     flip_v: p.flipV ?? false,
   }
   if (p.resolution) geometria.resolution = p.resolution
-  if (p.mode === 'invert') return { ...geometria, mode: 'invert' }
-  if (p.mode === 'none') return { ...geometria, mode: 'none' }
+  if (p.mode === 'kmeans' && p.kmeans) {
+    const { colors, smooth, name } = p.kmeans
+    return { ...geometria, mode: 'kmeans', colors, smooth, ...(name ? { name } : {}) }
+  }
+  if (p.mode === 'channels' && p.channels) {
+    return { ...geometria, mode: 'channels', channels: p.channels }
+  }
+  if (p.mode && p.mode !== 'colormap') return { ...geometria, mode: p.mode }
   return p.stops ? { ...geometria, stops: p.stops } : { ...geometria, name: p.name }
 }
 

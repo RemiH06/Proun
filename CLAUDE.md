@@ -138,11 +138,40 @@ docs/                       sitio de documentación (ver sección aparte)
   como para volver a colorear un wallpaper YA exportado (`recolorear.py`
   y la pestaña "recolorear" del GUI, ver más abajo), porque solo le
   importa el brillo de cada píxel, no de dónde salió.
+- **Degradados de dos puntos `blanco_azul` y `negro_azul`** (en
+  `recolor.COLORMAPS`, junto a los de matplotlib): el primer color va a las
+  sombras y el segundo a las luces, así que `blanco_azul` deja las sombras
+  blancas y las luces azules (`#3ba7ff`), y `negro_azul` las deja negras.
+  Son colormaps con nombre como los demás: aparecen solos como botones de la
+  pestaña "recolorear" y en `--name` de la CLI. Si el sentido se quiere al
+  revés, basta invertir el orden de la tupla.
+- **`recolor.mode = "invert_value"`** ("tonos invertidos" en la pestaña
+  "recolorear"): invierte solo la luminosidad (`V` en HSV), así lo claro
+  pasa a oscuro y al revés, pero el matiz y la saturación se conservan. No
+  es un negativo: un rojo sigue siendo rojo, solo más oscuro o más claro.
+  Export con sufijo `_tonos_invertidos`.
 - **`recolor.mode = "invert"`**: negativo fotográfico llano
   (`PIL.ImageOps.invert`, 255 menos cada canal), tampoco usa `main`.
   Reusa toda la infraestructura de alfa/`strength`/`saturation` que ya
   tiene `recolor.apply` en vez de resolverlo aparte: por eso vive como un
   modo más ahí y no como una función suelta.
+- **`recolor.mode = "kmeans"`** (botón "k-means" de la pestaña
+  "recolorear", `--kmeans N` en la CLI): clasificación no supervisada tipo
+  raster tools de ArcGIS. Los centros se calculan con `Image.quantize`
+  (corte por mediana + k-means) sobre una miniatura de 512 px y después se
+  mapea la imagen completa a esa paleta: así 1080p tarda ~0.5 s en vez de
+  ~4 s. `smooth` es el filtro de mayoría (`ModeFilter`, impar, ~1 s extra).
+  Sin `name`/`stops` cada clase conserva su color medio; con ellos se
+  pintan de oscura a clara con ese degradado. Export con sufijo
+  `_kmeans<N>` o `_kmeans<N>_<colormap>`.
+- **`recolor.mode = "channels"` con tintas**: además de `r`/`g`/`b`, acepta
+  `c`/`m`/`y`/`k` (no se mezclan los dos modelos en un mismo spec).
+  `_cmyk` hace la separación estándar con negro real: K = 255 menos el
+  canal más brillante, y cada tinta es lo que le falta a su canal
+  complementario para alcanzar ese máximo (la heurística "C = GB, Y = RG,
+  M = RB vistos como luz" es esta misma). Con ganancias neutras la vuelta a
+  RGB es exacta. `Image.convert("CMYK")` de Pillow no sirve: deja K en
+  cero. Export con sufijo `_canales`.
 - **`geometry.measure()` distingue fracción de píxeles por el tipo de
   Python, no por el valor**: `0.5` (float) es "mitad del lienzo", pero
   `1` (int) es "1 píxel", aunque numéricamente ambos podrían representar
@@ -299,6 +328,13 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   que ya está en inferno). `recolor.apply` no le importa de dónde salió
   el píxel, solo su brillo, así que cualquier archivo de la carpeta es un
   punto de partida válido.
+- **Switch "ocultar las ya usadas en wallpapers"** en `SourceFolderPicker`
+  (pestaña editor, columna izquierda): oculta las miniaturas que ya son
+  `src` de alguna capa de un JSON bajo `wallpapers/`. Lo calcula
+  `GET /api/sources/used` (`api/routes_sources.py::usadas_en`, que se
+  salta JSON rotos y archivos que no son JSON). Solo oculta en la lista:
+  una imagen ya seleccionada en el collage sigue ahí, se saca desde
+  su capa.
 - **"ninguna" en "Escala de color"**: `recolor.mode = "none"` ya existía
   en el motor (`recolor.apply` lo deja pasar tal cual), pero la pestaña
   "recolorear" no lo exponía. El botón sirve para usar esa pestaña solo
@@ -361,7 +397,7 @@ React) vía CDN de jsdelivr como módulo ES. Efectos:
   indicador.
 - **Mapa del código** (4ta tab): un `<iframe>` a `docs/ariadne/proun.html`,
   el diagrama interactivo que genera la skill `ariadne` (`ariadne generate
-  . --out docs/ariadne --title "Proun" --formats html --theme light
+  . --out docs/ariadne --title "Proun" --formats html
   --max-depth 2 --hide-generated`, corrido desde la raíz del repo).
   `--max-depth 2` es a propósito: sin eso la vista inicial explota en los
   ~1060 nodos de `tests/` (uno por clase/método) y tapa el resto del
@@ -369,9 +405,10 @@ React) vía CDN de jsdelivr como módulo ES. Efectos:
   expandir a mano. Ese HTML es generado, no se edita a mano, y hay que
   volver a correr el comando (y commitear el archivo de nuevo) si la
   estructura del proyecto cambia bastante; no hace falta por cada commit
-  chico. La UI del propio Ariadne (panel de filtros, colores) no sigue la
-  paleta constructivista del sitio a propósito: es una herramienta
-  embebida, no una sección de contenido del sitio.
+  chico. Sin `--theme`, Ariadne usa su tema `auto`: lee fondo, texto y
+  acento del contenedor del iframe (el papel y el rojo constructivista del
+  sitio) y deriva de ahí los colores de los nodos. No hace falta tocar
+  nada del sitio para que combine.
 - **Galería**: las cuatro capturas se ensamblan con un solo momento de
   animación al entrar en pantalla, no una entrada genérica por sección.
 

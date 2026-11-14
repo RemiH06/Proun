@@ -9,11 +9,17 @@ Modos:
     tint      multiplica los canales por el color, conserva la textura
     screen    aclara hacia el color, útil sobre fondos oscuros
     hue       impone el matiz, conserva saturación y luminosidad
-    channels  ganancia y desplazamiento explícitos por canal r, g, b
+    channels  ganancia y desplazamiento explícitos por canal: de luz (r, g,
+              b) o de tinta (c, m, y, k), ver `_cmyk`
     colormap  degradado de varios colores (`name`, ver COLORMAPS, o una
               lista propia en `stops`), no depende del color principal
+    kmeans    clasificación no supervisada, como la de las raster tools de
+              ArcGIS: agrupa los píxeles en `colors` clases y pinta cada una
+              con su color medio, o con un degradado si llega `name`/`stops`
     invert    negativo fotográfico (255 menos cada canal), no depende del
               color principal
+    invert_value  invierte solo la luminosidad: lo claro pasa a oscuro y al
+              revés, pero conserva matiz y saturación (no es un negativo)
     none      deja la capa tal cual
 
 `strength` mezcla el resultado con una referencia, y `mix_with` dice cuál:
@@ -26,19 +32,32 @@ Modos:
 
 from __future__ import annotations
 
-from PIL import Image, ImageChops, ImageEnhance, ImageOps
+from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageMath, ImageOps
 
 from .. import colors
 from ..errors import SpecError
 
-MODES = ("duotone", "tint", "screen", "hue", "channels", "colormap", "invert", "none")
+MODES = (
+    "duotone", "tint", "screen", "hue", "channels", "colormap", "kmeans",
+    "invert", "invert_value", "none",
+)
 
 MIX_SOURCES = ("tones", "source")
 
 KEYS = {
     "mode", "strength", "mix_with", "color", "shadow", "highlight",
     "midpoint", "levels", "saturation", "channels", "name", "stops",
+    "colors", "smooth",
 }
+
+# Rango de clases del modo "kmeans". Con menos de dos no hay nada que
+# clasificar; más de 32 ya no se distingue de la foto original.
+KMEANS_CLASES = (2, 32)
+# Iteraciones de refinamiento de k-means sobre el corte por mediana inicial.
+# Pillow se detiene antes si converge.
+_KMEANS_ITERACIONES = 10
+# Lado mayor de la muestra sobre la que se calculan los centros, ver _kmeans.
+_KMEANS_MUESTRA = 512
 
 # Degradados con nombre para el modo "colormap". Puntos de control de la
 # familia perceptualmente uniforme de matplotlib (la misma que trae ArcGIS
@@ -75,6 +94,10 @@ COLORMAPS = {
         (65, 219, 150), (146, 235, 88), (220, 216, 59), (253, 165, 49),
         (227, 89, 38), (159, 34, 27), (122, 4, 3),
     ),
+    # Dos puntos: el primer color va a las sombras y el segundo a las luces.
+    # El azul es el del proyecto (#3ba7ff).
+    "blanco_azul": ((255, 255, 255), (59, 167, 255)),
+    "negro_azul": ((0, 0, 0), (59, 167, 255)),
 }
 
 
@@ -100,6 +123,8 @@ def apply(im: Image.Image, main, spec=None, source: Image.Image | None = None) -
         out = _duotone(ImageOps.grayscale(base), main, spec)
     elif mode == "colormap":
         out = _colormap(ImageOps.grayscale(base), spec)
+    elif mode == "kmeans":
+        out = _kmeans(base, spec)
     elif mode == "tint":
         out = ImageChops.multiply(base, Image.new("RGB", base.size, main))
     elif mode == "screen":
@@ -108,6 +133,9 @@ def apply(im: Image.Image, main, spec=None, source: Image.Image | None = None) -
         out = _hue(base, main, spec)
     elif mode == "invert":
         out = ImageOps.invert(base)
+    elif mode == "invert_value":
+        h, s, v = base.convert("HSV").split()
+        out = Image.merge("HSV", (h, s, ImageOps.invert(v))).convert("RGB")
     else:
         out = _channels(base, spec)
 
@@ -159,19 +187,66 @@ def _colormap(gray: Image.Image, spec) -> Image.Image:
     """Mapea el tono (0 negro, 255 blanco) a un degradado de varios colores,
     en vez de a los dos extremos de un duotono. `stops` gana si viene junto
     con `name`."""
+    lut_r, lut_g, lut_b = _gradient_luts(_puntos(spec))
+    r, g, b = (gray.point(lut) for lut in (lut_r, lut_g, lut_b))
+    return Image.merge("RGB", (r, g, b))
+
+
+def _puntos(spec) -> tuple[tuple[int, int, int], ...]:
+    """Los colores de control del degradado: `stops` si viene, si no el
+    colormap con nombre (`inferno` por defecto)."""
     raw = spec.get("stops")
     if raw is not None:
         if not isinstance(raw, (list, tuple)) or len(raw) < 2:
             raise SpecError("recolor.stops necesita una lista de al menos dos colores")
-        puntos = tuple(colors.parse(c) for c in raw)
-    else:
-        name = str(spec.get("name", "inferno")).lower()
-        if name not in COLORMAPS:
-            raise SpecError(f"recolor.name debe ser uno de {sorted(COLORMAPS)}, llegó {name!r}")
-        puntos = COLORMAPS[name]
-    lut_r, lut_g, lut_b = _gradient_luts(puntos)
-    r, g, b = (gray.point(lut) for lut in (lut_r, lut_g, lut_b))
-    return Image.merge("RGB", (r, g, b))
+        return tuple(colors.parse(c) for c in raw)
+    name = str(spec.get("name", "inferno")).lower()
+    if name not in COLORMAPS:
+        raise SpecError(f"recolor.name debe ser uno de {sorted(COLORMAPS)}, llegó {name!r}")
+    return COLORMAPS[name]
+
+
+def _kmeans(base: Image.Image, spec) -> Image.Image:
+    """Clasificación no supervisada: corte por mediana para arrancar y
+    k-means para afinar los centros, todo dentro de `Image.quantize`.
+
+    `smooth` es el filtro de mayoría de ArcGIS (`ModeFilter`): cada píxel
+    toma la clase más frecuente de su vecindario, así desaparecen los
+    píxeles sueltos y quedan manchas limpias. Con `name` o `stops`, las
+    clases se pintan con ese degradado ordenadas de oscura a clara, como un
+    mapa clasificado; sin ellos, cada clase conserva su color medio.
+    """
+    clases = _entero(spec.get("colors", 6), "recolor.colors", *KMEANS_CLASES)
+    smooth = _entero(spec.get("smooth", 0), "recolor.smooth", 0, 15)
+    if smooth and smooth % 2 == 0:
+        raise SpecError(f"recolor.smooth debe ser 0 o un número impar (3, 5, 7...), llegó {smooth}")
+
+    # Los centros se buscan en una miniatura y después se mapea la imagen
+    # completa a esa paleta, sin tramado: en 1920x1080 baja de ~4 s a ~0.5 s
+    # y los centros casi no cambian, porque una muestra de píxeles alcanza
+    # para estimarlos (ArcGIS hace lo mismo con su muestreo).
+    muestra = base.copy()
+    muestra.thumbnail((_KMEANS_MUESTRA, _KMEANS_MUESTRA))
+    paleta = muestra.quantize(colors=clases, kmeans=_KMEANS_ITERACIONES)
+    mapa = base.quantize(palette=paleta, dither=Image.Dither.NONE)
+    if smooth:
+        mapa = mapa.filter(ImageFilter.ModeFilter(smooth))
+
+    if "name" in spec or "stops" in spec:
+        paleta = mapa.getpalette()
+        # Solo los índices que la imagen usa: la paleta puede venir rellena
+        # hasta 256 entradas y el relleno contaría como clases negras.
+        usados = [indice for _, indice in mapa.getcolors(256)]
+        # Luminancia de Rec. 601, la misma que usa ImageOps.grayscale.
+        orden = sorted(usados, key=lambda i: 0.299 * paleta[i * 3] + 0.587 * paleta[i * 3 + 1]
+                       + 0.114 * paleta[i * 3 + 2])
+        luts = _gradient_luts(_puntos(spec))
+        nueva = list(paleta)
+        for puesto, indice in enumerate(orden):
+            tono = round(puesto / max(1, len(orden) - 1) * 255)
+            nueva[indice * 3:indice * 3 + 3] = [lut[tono] for lut in luts]
+        mapa.putpalette(nueva)
+    return mapa.convert("RGB")
 
 
 def _gradient_luts(puntos: tuple[tuple[int, int, int], ...]):
@@ -203,21 +278,81 @@ def _channels(base: Image.Image, spec) -> Image.Image:
     raw = spec.get("channels")
     if not isinstance(raw, dict) or not raw:
         raise SpecError('el modo "channels" necesita recolor.channels, por ejemplo {"r": [1.2, 10]}')
-    unknown = set(raw) - {"r", "g", "b"}
+    unknown = set(raw) - set("rgbcmyk")
     if unknown:
-        raise SpecError(f"canales desconocidos: {sorted(unknown)}. Solo r, g y b")
+        raise SpecError(f"canales desconocidos: {sorted(unknown)}. Solo r, g, b o c, m, y, k")
+    ajustes = {name: _ganancia(name, setting) for name, setting in raw.items()}
+    if not set(raw) <= set("rgb"):
+        if set(raw) & set("rgb"):
+            raise SpecError("recolor.channels mezcla canales de luz (r, g, b) con tintas "
+                            "(c, m, y, k): elige uno de los dos modelos")
+        return _cmyk(base, ajustes)
     bands = dict(zip("rgb", base.split()))
-    for name, setting in raw.items():
-        if isinstance(setting, (int, float)) and not isinstance(setting, bool):
-            gain, offset = float(setting), 0.0
-        elif isinstance(setting, (list, tuple)) and len(setting) == 2:
-            gain, offset = float(setting[0]), float(setting[1])
-        else:
-            raise SpecError(f"channels.{name} debe ser ganancia o [ganancia, desplazamiento]")
+    for name, (gain, offset) in ajustes.items():
         bands[name] = bands[name].point(
             [min(255, max(0, round(i * gain + offset))) for i in range(256)]
         )
     return Image.merge("RGB", (bands["r"], bands["g"], bands["b"]))
+
+
+def _ganancia(name, setting) -> tuple[float, float]:
+    if isinstance(setting, (int, float)) and not isinstance(setting, bool):
+        return float(setting), 0.0
+    if (isinstance(setting, (list, tuple)) and len(setting) == 2
+            and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in setting)):
+        return float(setting[0]), float(setting[1])
+    raise SpecError(f"channels.{name} debe ser ganancia o [ganancia, desplazamiento]")
+
+
+def _cmyk(base: Image.Image, ajustes) -> Image.Image:
+    """Separa la imagen en cuatro tintas, les aplica ganancia y
+    desplazamiento, y la vuelve a armar en RGB.
+
+    El negro (K) es lo que le falta al canal más brillante para llegar a
+    255, o sea qué tan oscuro es el píxel. Cada tinta es lo que le falta a
+    su canal complementario para alcanzar a ese más brillante: el cian
+    absorbe el rojo, así que hay mucho cian donde verde y azul dominan y el
+    rojo no (C = GB, Y = RG, M = RB, vistos como luz). Es la separación
+    estándar de imprenta sin perfil de color; `Image.convert("CMYK")` de
+    Pillow no sirve para esto porque deja K siempre en cero.
+
+    Con ganancias en 1 y desplazamientos en 0 la vuelta es exacta: cada
+    canal se reconstruye como (255 - tinta) * (255 - K) / 255.
+    """
+    r, g, b = base.split()
+    brillo = ImageChops.lighter(ImageChops.lighter(r, g), b)
+
+    def tinta(canal):
+        # Donde brillo es 0 la división da 0 en ImageMath, y ahí la tinta no
+        # importa: K ya está en 255 y el píxel sale negro igual.
+        return ImageMath.lambda_eval(
+            lambda a: (a["brillo"] - a["canal"]) * 255.0 / a["brillo"],
+            brillo=brillo.convert("F"), canal=canal.convert("F"),
+        )
+
+    planchas = {
+        "c": tinta(r), "m": tinta(g), "y": tinta(b),
+        "k": ImageMath.lambda_eval(lambda a: 255.0 - a["brillo"], brillo=brillo.convert("F")),
+    }
+    for name, (gain, offset) in ajustes.items():
+        planchas[name] = ImageMath.lambda_eval(
+            lambda a: a["min"](a["max"](a["p"] * gain + offset, 0.0), 255.0), p=planchas[name],
+        )
+
+    def canal(plancha):
+        # +0.5 porque pasar de flotante a 8 bits trunca en vez de redondear.
+        return ImageMath.lambda_eval(
+            lambda a: (255.0 - a["p"]) * (255.0 - a["k"]) / 255.0 + 0.5,
+            p=plancha, k=planchas["k"],
+        ).convert("L")
+
+    return Image.merge("RGB", tuple(canal(planchas[t]) for t in "cmy"))
+
+
+def _entero(value, name, low, high) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+        raise SpecError(f"{name} debe ser un entero entre {low} y {high}, llegó {value!r}")
+    return value
 
 
 def _levels(value) -> tuple[int, int]:

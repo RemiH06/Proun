@@ -56,7 +56,8 @@ def _preparar(body: RecolorGeometry, ruta: str) -> Image.Image:
 def _repintar(body: RecolorRequest) -> Image.Image:
     ruta = resolve_sources_path(body.path)
     imagen = _preparar(body, ruta)
-    return recolorear.recolorear(imagen, mode=body.mode, name=body.name, stops=body.stops)
+    return recolorear.recolorear(imagen, mode=body.mode, name=body.name, stops=body.stops,
+                                 colors=body.colors, smooth=body.smooth, channels=body.channels)
 
 
 @router.post("/recolor/preview")
@@ -71,12 +72,7 @@ def preview(body: RecolorRequest) -> Response:
 def export(body: RecolorRequest) -> Response:
     imagen = _repintar(body)
     origen = Path(resolve_sources_path(body.path))
-    if body.mode == "invert":
-        sufijo = "invertido"
-    elif body.mode == "none":
-        sufijo = "redimensionado"
-    else:
-        sufijo = "personalizado" if body.stops else body.name
+    sufijo = recolorear.sufijo(body.mode, body.name, body.stops, body.colors)
     destino = origen.with_stem(f"{origen.stem}_{sufijo}")
     imagen.convert("RGB").save(destino)
     return Response(
