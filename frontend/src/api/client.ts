@@ -9,6 +9,8 @@ export type Options = {
   recolor_modes: string[]
   blend_modes: string[]
   shape_kinds: string[]
+  // Figura iso -> [mínimo, por defecto, máximo] de su tamaño (proun/ops/iso.py).
+  iso_figures: Record<string, [number, number, number]>
   colormaps: string[]
 }
 
@@ -31,7 +33,25 @@ export type MosaicConfig = null | { cols: number; rows: number; mirror: boolean 
 // Fracción [0,1] del lienzo; null = el layout la ubica solo, como siempre.
 export type PositionConfig = null | { x: number; y: number }
 
-export type ShapeKind = 'rect' | 'circle' | 'triangle' | 'diamond' | 'polygon'
+export type ShapeKind = 'rect' | 'circle' | 'triangle' | 'diamond' | 'polygon' | 'iso'
+
+// Colores de las tres caras de una figura iso: [arriba, izquierda, derecha].
+export type FaceColors = [string, string, string]
+
+// La paleta de la imagen de referencia de figuras imposibles: naranja
+// arriba, turquesa a la izquierda, gris cálido a la derecha.
+export const DEFAULT_FACE_COLORS: FaceColors = ['#f08c50', '#3cb4b4', '#6b5e5a']
+
+// Copia de proun/ops/iso.py::FIGURAS ([mínimo, por defecto, máximo]) para
+// cuando /api/options todavía no llega o para leer un JSON sin `size`. La
+// fuente de verdad sigue siendo la de /api/options.
+export const ISO_FIGURES_FALLBACK: Record<string, [number, number, number]> = {
+  cubo: [1, 1, 1],
+  escalera: [2, 4, 8],
+  cruz: [1, 2, 8],
+  marco: [3, 4, 8],
+  penrose: [4, 5, 10],
+}
 
 // Ajustes que comparten las tres clases de capa (imagen, figura, texto).
 // Los valores "por defecto" no viajan al backend: toLayerDict() solo manda
@@ -79,6 +99,11 @@ export type ShapeLayer = CommonLayer & {
   sides: number
   outlineWidth: number
   outlineInset: number
+  // Solo para shapeKind 'iso'. faceColors null = las caras se recolorean
+  // con el modo del lote, como cualquier capa.
+  isoFigure: string
+  isoSize: number
+  faceColors: FaceColors | null
 }
 export type TextLayer = CommonLayer & {
   kind: 'text'
@@ -115,7 +140,17 @@ export function newImageLayer(path: string, name: string): ImageLayer {
 }
 
 export function newShapeLayer(shapeKind: ShapeKind = 'circle'): ShapeLayer {
-  return { ...commonDefaults(), kind: 'shape', shapeKind, sides: 6, outlineWidth: 0, outlineInset: 0.12 }
+  return {
+    ...commonDefaults(),
+    kind: 'shape',
+    shapeKind,
+    sides: 6,
+    outlineWidth: 0,
+    outlineInset: 0.12,
+    isoFigure: 'penrose',
+    isoSize: 5,
+    faceColors: null,
+  }
 }
 
 export function newTextLayer(): TextLayer {
@@ -134,6 +169,15 @@ export function toLayerDict(cfg: LayerConfig): Record<string, unknown> {
 
   if (cfg.kind === 'image') {
     layer.src = cfg.path
+  } else if (cfg.kind === 'shape' && cfg.shapeKind === 'iso') {
+    // Sin contorno: el motor lo rechaza en las figuras iso.
+    layer.shape = { kind: 'iso', figure: cfg.isoFigure, size: cfg.isoSize }
+    if (cfg.faceColors) {
+      // Las caras salen en gris 0 (derecha), 128 (izquierda) y 255 (arriba):
+      // un colormap de tres stops en ese orden le da su color a cada una.
+      const [arriba, izquierda, derecha] = cfg.faceColors
+      layer.recolor = { mode: 'colormap', stops: [derecha, izquierda, arriba] }
+    }
   } else if (cfg.kind === 'shape') {
     layer.shape = cfg.shapeKind === 'polygon' ? { kind: 'polygon', sides: cfg.sides } : cfg.shapeKind
     if (cfg.outlineWidth > 0) {
@@ -597,7 +641,39 @@ function parseBackgroundDict(raw: unknown): BackgroundConfig {
   return bg
 }
 
-const SHAPE_KINDS: ShapeKind[] = ['rect', 'circle', 'triangle', 'diamond', 'polygon']
+const SHAPE_KINDS: ShapeKind[] = ['rect', 'circle', 'triangle', 'diamond', 'polygon', 'iso']
+
+// El camino inverso de la rama iso de toLayerDict: figura, tamaño y, si el
+// recolor de la capa es el colormap de tres stops que arma el editor, los
+// colores de las caras.
+function parseIso(
+  raw: Unknown,
+  warnings: string[],
+  indice: number,
+): { isoFigure: string; isoSize: number; faceColors: FaceColors | null } {
+  const forma = esObjeto(raw.shape) ? raw.shape : {}
+  let isoFigure = typeof forma.figure === 'string' ? forma.figure : 'cubo'
+  let isoSize = typeof forma.size === 'number' ? forma.size : 1
+  if (forma.voxels !== undefined) {
+    warnings.push(`capa ${indice + 1}: figura iso con cubos propios ("voxels"), el editor no la representa, se usó un cubo`)
+    isoFigure = 'cubo'
+    isoSize = 1
+  } else if (typeof forma.size !== 'number') {
+    // Sin tamaño, el motor usa el de cada figura.
+    isoSize = ISO_FIGURES_FALLBACK[isoFigure]?.[1] ?? 1
+  }
+
+  let faceColors: FaceColors | null = null
+  const recolor = raw.recolor
+  if (esObjeto(recolor) && recolor.mode === 'colormap' && Array.isArray(recolor.stops)
+      && recolor.stops.length === 3 && recolor.stops.every((s) => typeof s === 'string')) {
+    const [derecha, izquierda, arriba] = recolor.stops as string[]
+    faceColors = [arriba, izquierda, derecha]
+  } else if (recolor !== undefined) {
+    warnings.push(`capa ${indice + 1}: recolor propio que el editor no representa, se usó el del lote`)
+  }
+  return { isoFigure, isoSize, faceColors }
+}
 
 function parseLayerDict(raw: Unknown, warnings: string[], indice: number): LayerConfig | null {
   let base: LayerConfig
@@ -614,6 +690,8 @@ function parseLayerDict(raw: Unknown, warnings: string[], indice: number): Layer
     } else if (esObjeto(raw.shape) && raw.shape.kind === 'polygon') {
       shapeKind = 'polygon'
       if (typeof raw.shape.sides === 'number') sides = raw.shape.sides
+    } else if (raw.shape === 'iso' || (esObjeto(raw.shape) && raw.shape.kind === 'iso')) {
+      shapeKind = 'iso'
     }
     let outlineWidth: number | undefined
     let outlineInset: number | undefined
@@ -627,6 +705,9 @@ function parseLayerDict(raw: Unknown, warnings: string[], indice: number): Layer
       sides,
       outlineWidth: outlineWidth ?? plantillaFigura.outlineWidth,
       outlineInset: outlineInset ?? plantillaFigura.outlineInset,
+    }
+    if (shapeKind === 'iso') {
+      base = { ...base, ...parseIso(raw, warnings, indice) }
     }
   } else if (raw.text !== undefined) {
     const plantillaTexto = newTextLayer()

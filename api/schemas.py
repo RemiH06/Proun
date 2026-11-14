@@ -31,6 +31,9 @@ class LayerSpec(BaseModel):
     opacity: float | None = None
     blend: str | None = None
     color: str | None = None
+    # Recoloreado propio de la capa, en vez del modo global del lote. El
+    # editor lo usa para pintar cada cara de una figura iso con su color.
+    recolor: dict | None = None
     repeat: dict | None = None
     mosaic: dict | None = None
     position: list[float] | None = None

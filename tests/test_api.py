@@ -19,7 +19,7 @@ from api.routes_sources import usadas_en
 from api.schemas import LayerSpec, PreviewRequest
 from proun import compose, layout, loading
 from proun import spec as spec_module
-from proun.ops import blend, recolor, shapes
+from proun.ops import blend, iso, recolor, shapes
 
 RAIZ = Path(tempfile.mkdtemp(prefix="proun-api-"))
 FUENTES = RAIZ / "fuentes"
@@ -132,6 +132,35 @@ class Opciones(unittest.TestCase):
         self.assertEqual(datos["blend_modes"], list(blend.MODES))
         self.assertEqual(datos["shape_kinds"], list(shapes.KINDS))
         self.assertEqual(datos["colormaps"], list(recolor.COLORMAPS))
+        self.assertEqual(datos["iso_figures"],
+                         {nombre: list(rango) for nombre, rango in iso.FIGURAS.items()})
+
+
+class FiguraIso(unittest.TestCase):
+    def capa(self, **extra):
+        return {"shape": {"kind": "iso", "figure": "penrose", "size": 5},
+                "position": [0.5, 0.5], **extra}
+
+    def test_preview_con_figura_iso(self):
+        resp = client.post("/api/preview", json=cuerpo(layers=[self.capa()]))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_recolor_propio_de_la_capa_llega_al_motor(self):
+        # Pydantic ignora en silencio las claves que el modelo no conoce: si
+        # `recolor` no estuviera en LayerSpec, las dos vistas saldrían iguales.
+        del_lote = client.post("/api/preview", json=cuerpo(layers=[self.capa()]))
+        caras = client.post("/api/preview", json=cuerpo(layers=[self.capa(recolor={
+            "mode": "colormap", "stops": ["#6b5e5a", "#3cb4b4", "#f08c50"],
+        })]))
+        self.assertEqual(caras.status_code, 200)
+        self.assertNotEqual(del_lote.content, caras.content)
+
+    def test_figura_invalida_da_400_en_espanol(self):
+        resp = client.post("/api/preview", json=cuerpo(layers=[
+            {"shape": {"kind": "iso", "figure": "penrose", "size": 2}},
+        ]))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("entero entre", resp.json()["detail"])
 
 
 class Fuentes(unittest.TestCase):

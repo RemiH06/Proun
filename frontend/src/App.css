@@ -329,6 +329,11 @@
   clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
 }
 
+/* El hexágono que deja un cubo visto en isométrica. */
+.shape-swatch-iso {
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+
 .collapse-toggle,
 .duplicate,
 .remove {

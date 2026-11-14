@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { LayerConfig, Options, ShapeKind } from '../api/client'
-import { thumbnailUrl } from '../api/client'
+import { ISO_FIGURES_FALLBACK, thumbnailUrl } from '../api/client'
 import { FinishControls } from './FinishControls'
+import { IsoControls } from './IsoControls'
 import { PositionPad } from './PositionPad'
 import { Stepper } from './Stepper'
 
@@ -64,6 +65,7 @@ const SHAPE_LABELS: Record<ShapeKind, string> = {
   triangle: 'triángulo',
   diamond: 'rombo',
   polygon: 'polígono',
+  iso: 'isométrica',
 }
 
 function encabezado(c: LayerConfig) {
@@ -95,7 +97,8 @@ function encabezado(c: LayerConfig) {
 export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDuplicate }: Props) {
   const [colapsado, setColapsado] = useState(false)
   const blendModes = options?.blend_modes ?? [c.blend]
-  const shapeKinds = (options?.shape_kinds ?? ['rect', 'circle', 'triangle', 'diamond', 'polygon']) as ShapeKind[]
+  const shapeKinds = (options?.shape_kinds ?? ['rect', 'circle', 'triangle', 'diamond', 'polygon', 'iso']) as ShapeKind[]
+  const isoFigures = options?.iso_figures ?? ISO_FIGURES_FALLBACK
 
   return (
     <section className="panel image-panel">
@@ -192,24 +195,30 @@ export function LayerConfigPanel({ config: c, options, onUpdate, onRemove, onDup
               <Stepper value={c.sides} min={3} max={12} onChange={(sides) => onUpdate({ sides })} />
             </div>
           )}
-          <span className="control-label">contorno (ancho)</span>
-          <input
-            type="range"
-            min={0}
-            max={0.3}
-            step={0.01}
-            value={c.outlineWidth}
-            onChange={(e) => onUpdate({ outlineWidth: Number(e.target.value) })}
-          />
-          <span className="control-label">contorno (qué tan adentro)</span>
-          <input
-            type="range"
-            min={0}
-            max={0.5}
-            step={0.01}
-            value={c.outlineInset}
-            onChange={(e) => onUpdate({ outlineInset: Number(e.target.value) })}
-          />
+          {c.shapeKind === 'iso' ? (
+            <IsoControls config={c} figures={isoFigures} onUpdate={onUpdate} />
+          ) : (
+            <>
+              <span className="control-label">contorno (ancho)</span>
+              <input
+                type="range"
+                min={0}
+                max={0.3}
+                step={0.01}
+                value={c.outlineWidth}
+                onChange={(e) => onUpdate({ outlineWidth: Number(e.target.value) })}
+              />
+              <span className="control-label">contorno (qué tan adentro)</span>
+              <input
+                type="range"
+                min={0}
+                max={0.5}
+                step={0.01}
+                value={c.outlineInset}
+                onChange={(e) => onUpdate({ outlineInset: Number(e.target.value) })}
+              />
+            </>
+          )}
         </div>
       )}
 

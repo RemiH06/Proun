@@ -10,6 +10,7 @@ mapea el blanco a la luz y el gris del contorno a un tono intermedio.
 Formas aceptadas en `shape`:
     "circle"                     un tipo entre rect, circle, triangle, diamond
     {"kind": "polygon", "sides": 6}   polígono regular de n lados (3 a 12)
+    {"kind": "iso", "figure": "penrose"}   figura isométrica de cubos, ver ops/iso.py
 
 Contorno, en `outline`, opcional:
     {"inset": 0.12, "width": 0.03}
@@ -26,8 +27,9 @@ from PIL import Image, ImageDraw
 
 from ..errors import SpecError
 from ..geometry import measure
+from . import iso
 
-KINDS = ("rect", "circle", "triangle", "diamond", "polygon")
+KINDS = ("rect", "circle", "triangle", "diamond", "polygon", "iso")
 
 BASE = 512  # tamaño nominal de referencia para inset/width, antes de resize
 SUPERSAMPLE = 4
@@ -40,6 +42,12 @@ def build(shape, outline=None) -> Image.Image:
     """Genera la figura en escala de grises, lista para `recolor`."""
     kind, sides = _parse_kind(shape)
     inset, width = _parse_outline(outline)
+    if kind == "iso":
+        # Sus caras ya separan los tonos; un contorno encima taparía la
+        # cara oscura con un gris que no es ninguna de las tres.
+        if width > 0:
+            raise SpecError("las figuras iso no llevan contorno: quita 'outline'")
+        return iso.build(shape if isinstance(shape, dict) else {"kind": "iso"})
 
     lado = BASE * SUPERSAMPLE
     im = Image.new("L", (lado, lado), 0)

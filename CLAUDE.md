@@ -172,6 +172,24 @@ docs/                       sitio de documentación (ver sección aparte)
   M = RB vistos como luz" es esta misma). Con ganancias neutras la vuelta a
   RGB es exacta. `Image.convert("CMYK")` de Pillow no sirve: deja K en
   cero. Export con sufijo `_canales`.
+- **Figuras isométricas (`shape: {"kind": "iso", ...}`, `ops/iso.py`)**:
+  pintor de cubos en proyección isométrica, sin 3D real. Cada cara sale en
+  un gris fijo (arriba 255, izquierda 128, derecha 0), así que el `recolor`
+  de siempre decide el color: con `duotone` caen justo en luz/principal/
+  sombra, y con un colormap de tres `stops` (orden derecha, izquierda,
+  arriba) cada cara toma uno. Eso hace el control "tres colores" del
+  editor, mandando `recolor` propio en la capa (`LayerSpec.recolor`).
+  Figuras con nombre en `iso.FIGURAS` (cubo, escalera, cruz, marco,
+  penrose, con su rango de `size`, publicado en `/api/options` como
+  `iso_figures`) o cubos propios en `voxels`. El truco de las imposibles:
+  mover un punto por (1, 1, 1) no cambia su proyección, así que la punta
+  del tercer brazo del Penrose cae sobre el inicio del primero; un cuarto
+  valor `t` por cubo lo pinta como si estuviera `t` pasos atrás en esa
+  diagonal (mitad superior del brazo que sube), y las caras tocadas por un
+  vecino (en la posición real o en la desplazada) no se dibujan, para que
+  el corte en dos órdenes de pintado no deje costura. Sin contorno: el
+  motor lo rechaza. La imagen sale recortada a su contenido, no en un
+  cuadro de BASE x BASE como las demás figuras.
 - **`geometry.measure()` distingue fracción de píxeles por el tipo de
   Python, no por el valor**: `0.5` (float) es "mitad del lienzo", pero
   `1` (int) es "1 píxel", aunque numéricamente ambos podrían representar

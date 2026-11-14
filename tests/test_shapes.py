@@ -21,7 +21,11 @@ class Generacion(unittest.TestCase):
             spec = {"kind": kind, "sides": 6} if kind == "polygon" else kind
             im = shapes.build(spec)
             self.assertEqual(im.mode, "RGBA")
-            self.assertEqual(im.size, (shapes.BASE, shapes.BASE))
+            if kind == "iso":
+                # Recortada a su contenido: solo el lado mayor mide BASE.
+                self.assertEqual(max(im.size), shapes.BASE)
+            else:
+                self.assertEqual(im.size, (shapes.BASE, shapes.BASE))
             self.assertGreater(im.getchannel("A").getextrema()[1], 0, kind)
 
     def test_texto_suelto_equivale_a_kind(self):

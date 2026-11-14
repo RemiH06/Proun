@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from proun import layout
 from proun.errors import SpecError
-from proun.ops import blend, recolor, shapes
+from proun.ops import blend, iso, recolor, shapes
 
 from . import routes_recolor, routes_render, routes_sources
 
@@ -31,6 +31,8 @@ def options() -> dict:
         "recolor_modes": list(recolor.MODES),
         "blend_modes": list(blend.MODES),
         "shape_kinds": list(shapes.KINDS),
+        # Figura iso -> [mínimo, por defecto, máximo] de su `size`.
+        "iso_figures": {nombre: list(rango) for nombre, rango in iso.FIGURAS.items()},
         "colormaps": list(recolor.COLORMAPS),
     }
 

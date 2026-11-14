@@ -11,6 +11,7 @@ const SHAPES: Array<{ label: string; kind: ShapeKind }> = [
   { label: 'triángulo', kind: 'triangle' },
   { label: 'rombo', kind: 'diamond' },
   { label: 'polígono', kind: 'polygon' },
+  { label: 'isométrica', kind: 'iso' },
 ]
 
 export function AddLayerButtons({ onAddShape, onAddText }: Props) {
