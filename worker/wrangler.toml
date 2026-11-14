@@ -1,0 +1,7 @@
+# Worker que sirve /docs de proun.remlam.dev desde GitHub Pages (docs.js).
+# Desplegar desde esta carpeta: npx wrangler login (una vez), npx wrangler deploy
+name = "proun-docs"
+main = "docs.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+routes = [{ pattern = "proun.remlam.dev/docs*", zone_name = "remlam.dev" }]

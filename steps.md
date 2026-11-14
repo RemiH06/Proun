@@ -75,15 +75,31 @@ Commit sugerido:
        de imágenes): bajos, sin hacer.
      - B3: `steps.md` está versionado pese al `.gitignore` (revela el
        esquema de despliegue): `git rm --cached steps.md`.
-  2. Remi: commit y push. En Pixilate (WSL): clonar en `~/srv/proun`,
-     copiar `fuentes/` (220 MB), `docker compose up -d --build`, probar
-     por túnel SSH (`ssh -N -L 8031:localhost:8031 pixilate`).
-  3. Remi en el panel: hostname `proun.remlam.dev` → `http://localhost:8031`
-     en el túnel, app de Access en `proun.remlam.dev` y app Bypass en
-     `proun.remlam.dev/docs`.
-  4. Verificar desde datos móviles: `/docs/` abre sin login, `/` y
-     `/api/*` piden login. Anotar en `29.Bakery/steps.md`.
-  5. Canonical y `og:` (con `images/obras/penrose-1600.webp`) en la
+  2. Hecho (2026-11-14): clon en `~/srv/proun` del WSL de Pixilate
+     (`7878783`), `fuentes/` copiada (165 archivos), `docker compose up -d
+     --build`. Verificado sin publicar: escucha solo `127.0.0.1:8031`,
+     healthy, uid 10001, ~117 MB tras un render, `/docs` 308 a `/docs/`,
+     Swagger y `obras.py` en 404, cabeceras puestas, `/etc` da 400,
+     preview y export reales en ~0.5 s, `fuentes/` de solo lectura.
+     Capturas por túnel SSH: GUI y landing cargan sin errores.
+     Desplegar cambios: `cd ~/srv/proun && git pull && docker compose up
+     -d --build`.
+  3. Hecho (2026-11-14): publicado en `proun.remlam.dev`. Access en todo
+     el hostname, Bypass en `/docs`. El 1033 inicial era un CNAME `proun`
+     que apuntaba a un túnel creado por error y luego borrado.
+  4. Hecho: verificado desde fuera. `/docs/` 200 sin login; `/` y
+     `/api/*` 302 al login; `/docs/../api` también al login; `/DOCS/`
+     pasa el Bypass pero el origen da 404. Anotado en `29.Bakery/steps.md`.
+     Sin HSTS en la respuesta: `.dev` ya está precargado en los
+     navegadores.
+  4b. Worker de `/docs` (opción A, 2026-11-14): `worker/docs.js` sirve la
+     landing desde GitHub Pages bajo `proun.remlam.dev/docs`. 9 pruebas
+     con `node --test worker/docs.test.mjs` y probado contra Pages en
+     vivo. Falta: Remi lo crea en el panel (Workers, pegar `docs.js`,
+     ruta `proun.remlam.dev/docs*`) y se verifica desde fuera.
+  5. Texto de ayuda de `SourceFolderPicker`: dice "relativa o absoluta";
+     publicado solo valen `fuentes/` y `wallpapers/`.
+  6. Canonical y `og:` (con `images/obras/penrose-1600.webp`) en la
      landing, `launch-checklist`.
 
 ### B. Ideas de retro-art-studio (solo inspiración: sin licencia clara)

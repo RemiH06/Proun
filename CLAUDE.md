@@ -401,6 +401,15 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   - Pillow 13 como mínimo: la 10.4 tenía 69 CVE (`pip-audit`).
   - Pruebas: `tests/test_topes.py` y las clases `CarpetasPermitidas`,
     `TopesDeLaApi` y `SitioPublicado` de `tests/test_api.py`.
+  - **`/docs` público lo sirve un Worker de Cloudflare**, no Pixilate:
+    `worker/docs.js` pide cada archivo a GitHub Pages
+    (`remih06.github.io/Proun`), reescribe sus redirecciones absolutas a
+    `/docs/...` y pone las mismas cabeceras que `api/main.py`. Una sola
+    copia que se actualiza con cada push, y la landing sigue arriba con
+    Pixilate apagada. La ruta (`proun.remlam.dev/docs*`) está en
+    `worker/wrangler.toml`. El montaje de `docs/` en `api/main.py` se
+    queda para uso local. Pruebas: `node --test worker/docs.test.mjs`
+    (fetch simulado, sin red).
 
 Esta v2.0 local ya cubre todo el editor visual de specs. Movido a v3.0 (hosteada, no ahora): subida/almacenamiento real de imágenes
 (sigue siendo una carpeta local en disco por ahora, decidido a propósito:
