@@ -15,23 +15,38 @@ from fastapi.responses import Response
 
 from proun import colors, compose, naming
 from proun import spec as spec_module
+from proun.errors import SpecError
 
 from .cache import cache, geometry_hash
+from .paths import resolve_sources_path
 from .schemas import ExportRequest, PreviewRequest
 
 router = APIRouter()
 
 PREVIEW_LADO_MAYOR = 480
+# Tope del lado mayor de cualquier lienzo que pida el cliente: cubre 4K y
+# todas las pantallas de celular de `RESOLUTIONS` en `client.ts`, y evita
+# que una sola petición ocupe el CPU minutos con un lienzo gigante. La CLI
+# no pasa por aquí: sigue sin tope.
+LADO_MAXIMO = 4096
 
 _MEDIA_TYPES = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
                 "webp": "image/webp"}
+
+
+def dimensiones(resolution: str) -> tuple[int, int]:
+    """`spec.parse_resolutions` de una sola resolución, con `LADO_MAXIMO`."""
+    ancho, alto = spec_module.parse_resolutions([resolution])[0]
+    if max(ancho, alto) > LADO_MAXIMO:
+        raise SpecError(f"la resolución no puede pasar de {LADO_MAXIMO} px por lado, llegó {resolution}")
+    return ancho, alto
 
 
 def _resolucion_de_vista_previa(resolution: str) -> str:
     """Vista previa chica, pero con el mismo aspecto que se va a exportar:
     si no, elegir un tamaño de celular (vertical) se seguiría viendo
     horizontal en la vista previa hasta exportar de verdad."""
-    ancho, alto = spec_module.parse_resolutions([resolution])[0]
+    ancho, alto = dimensiones(resolution)
     factor = PREVIEW_LADO_MAYOR / max(ancho, alto)
     return f"{max(1, round(ancho * factor))}x{max(1, round(alto * factor))}"
 
@@ -51,15 +66,30 @@ def _sin_explosion_de_mosaico(capa: dict, lado_mayor: int) -> dict:
     return {**capa, "resize": {"max_side": max(1, round(lado_mayor / factor))}}
 
 
+def _rutas_permitidas(capa: dict) -> dict:
+    """Las dos rutas de archivo que puede traer una capa (`src` y la `font`
+    de un texto) pasan por `resolve_sources_path`: ver `api/paths.py`."""
+    if "src" in capa:
+        capa = {**capa, "src": resolve_sources_path(capa["src"])}
+    texto = capa.get("text")
+    if isinstance(texto, dict) and "font" in texto:
+        capa = {**capa, "text": {**texto, "font": resolve_sources_path(str(texto["font"]))}}
+    return capa
+
+
 def _spec_dict(body: PreviewRequest, resolution: str, fmt: str = "png",
                output: str = "wallpapers") -> dict:
     """El dict tal cual lo espera `spec.build` (y la CLI vía `--spec`), sin
     normalizar: separado de `_build_spec` para poder devolvérselo al
     frontend como JSON editable/reconstruible (`/api/spec`), no solo para
     armar la `Spec` ya resuelta que necesita `compose`."""
-    lado_mayor = max(spec_module.parse_resolutions([resolution])[0])
+    lado_mayor = max(dimensiones(resolution))
+    # `output` se valida aquí pero se guarda tal cual llegó: este dict es
+    # también el JSON que se descarga, y una ruta absoluta de esta máquina no
+    # le sirve a la CLI en otra. `_build_spec` usa la ya resuelta.
+    resolve_sources_path(output)
     sources = [
-        _sin_explosion_de_mosaico(capa.model_dump(exclude_none=True), lado_mayor)
+        _sin_explosion_de_mosaico(_rutas_permitidas(capa.model_dump(exclude_none=True)), lado_mayor)
         for capa in body.layers
     ]
     return {
@@ -78,7 +108,8 @@ def _spec_dict(body: PreviewRequest, resolution: str, fmt: str = "png",
 
 def _build_spec(body: PreviewRequest, resolution: str, fmt: str = "png",
                 output: str = "wallpapers"):
-    return spec_module.build(_spec_dict(body, resolution, fmt, output))
+    datos = _spec_dict(body, resolution, fmt, output)
+    return spec_module.build({**datos, "output": resolve_sources_path(output)})
 
 
 def _render(body: PreviewRequest, resolution: str, fmt: str = "png", output: str = "wallpapers"):

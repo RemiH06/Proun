@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 import shutil
 import tempfile
 import unittest
@@ -32,7 +33,14 @@ GRANDE = FUENTES / "grande.png"
 WALLPAPER = FUENTES / "wallpaper.png"
 
 
+_RAICES_ANTES = os.environ.get("PROUN_RAICES")
+
+
 def setUpModule():
+    # Las pruebas trabajan en una carpeta temporal, fuera de las raíces por
+    # defecto (fuentes/ y wallpapers/ del repo): se agrega a las permitidas.
+    os.environ["PROUN_RAICES"] = os.pathsep.join(
+        [str(RAIZ), str(PROJECT_ROOT / "fuentes"), str(PROJECT_ROOT / "wallpapers")])
     FUENTES.mkdir(parents=True)
     for i, archivo in enumerate(ARCHIVOS):
         Image.new("RGB", (200, 150), (20 * i, 60, 120)).save(archivo)
@@ -45,6 +53,10 @@ def setUpModule():
 
 
 def tearDownModule():
+    if _RAICES_ANTES is None:
+        os.environ.pop("PROUN_RAICES", None)
+    else:
+        os.environ["PROUN_RAICES"] = _RAICES_ANTES
     shutil.rmtree(RAIZ, ignore_errors=True)
 
 
@@ -120,6 +132,85 @@ class RutasDeFuentes(unittest.TestCase):
     def test_el_endpoint_devuelve_la_ruta_ya_resuelta(self):
         resp = client.get("/api/sources", params={"path": "fuentes"})
         self.assertEqual(resp.json()["path"], str(PROJECT_ROOT / "fuentes"))
+
+
+class CarpetasPermitidas(unittest.TestCase):
+    """Ninguna ruta del cliente sale de las raíces permitidas: ver
+    api/paths.py. Afuera queda una imagen real, para que un 400 no se pueda
+    deber a que el archivo no existe."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.afuera = Path(tempfile.mkdtemp(prefix="proun-afuera-"))
+        cls.foto = cls.afuera / "secreta.png"
+        Image.new("RGB", (64, 64), (200, 10, 10)).save(cls.foto)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.afuera, ignore_errors=True)
+
+    def assert_rechazada(self, resp):
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("fuera de las carpetas permitidas", resp.json()["detail"])
+
+    def test_listar_una_carpeta_de_afuera(self):
+        self.assert_rechazada(client.get("/api/sources", params={"path": str(self.afuera)}))
+
+    def test_miniatura_de_afuera(self):
+        self.assert_rechazada(client.get("/api/sources/thumbnail", params={"path": str(self.foto)}))
+
+    def test_capa_con_src_de_afuera(self):
+        self.assert_rechazada(client.post("/api/preview", json=cuerpo(
+            layers=[{"src": str(self.foto)}])))
+
+    def test_texto_con_fuente_de_afuera(self):
+        self.assert_rechazada(client.post("/api/preview", json=cuerpo(
+            layers=[{"text": {"text": "hola", "font": str(self.foto)}}])))
+
+    def test_export_con_salida_de_afuera(self):
+        resp = client.post("/api/export", json=cuerpo(resolution="320x200", output=str(self.afuera)))
+        self.assert_rechazada(resp)
+        self.assertEqual(list(self.afuera.iterdir()), [self.foto])
+
+    def test_recolorear_de_afuera(self):
+        self.assert_rechazada(client.post("/api/recolor/export", json={"path": str(self.foto)}))
+        self.assertEqual(list(self.afuera.iterdir()), [self.foto])
+
+    def test_dos_puntos_no_escapan(self):
+        escape = str(FUENTES / ".." / ".." / self.afuera.name / "secreta.png")
+        self.assert_rechazada(client.get("/api/sources/thumbnail", params={"path": escape}))
+
+    def test_sin_variable_solo_fuentes_y_wallpapers(self):
+        with patch.dict(os.environ, {"PROUN_RAICES": ""}):
+            self.assertEqual(resolve_sources_path("wallpapers"), str(PROJECT_ROOT / "wallpapers"))
+            with self.assertRaises(spec_module.SpecError):
+                resolve_sources_path(str(FUENTES))
+            with self.assertRaises(spec_module.SpecError):
+                resolve_sources_path("api")
+
+
+class SinDocumentacionDeLaApi(unittest.TestCase):
+    """`/docs` es la landing en el sitio publicado: FastAPI no lo reclama."""
+
+    def test_swagger_redoc_y_openapi_apagados(self):
+        for ruta in ("/docs", "/redoc", "/openapi.json"):
+            self.assertEqual(client.get(ruta).status_code, 404, ruta)
+
+
+class TopeDeResolucion(unittest.TestCase):
+    def test_preview_rechaza_un_lienzo_gigante(self):
+        resp = client.post("/api/preview", json=cuerpo(resolution="8000x6000"))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("no puede pasar de", resp.json()["detail"])
+
+    def test_recolor_rechaza_una_resolucion_gigante(self):
+        resp = client.post("/api/recolor/preview",
+                           json={"path": str(WALLPAPER), "resolution": "9000x9000"})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_4k_y_celulares_entran(self):
+        resp = client.post("/api/spec", json=cuerpo(resolution="3840x2160"))
+        self.assertEqual(resp.status_code, 200)
 
 
 class Opciones(unittest.TestCase):

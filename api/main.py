@@ -15,7 +15,9 @@ from proun.ops import blend, iso, recolor, shapes
 
 from . import routes_recolor, routes_render, routes_sources
 
-app = FastAPI(title="Proun API")
+# Sin Swagger/ReDoc/OpenAPI: `/docs` es la landing en el sitio publicado, y
+# el esquema de la API no tiene por qué quedar a la vista de quien entre.
+app = FastAPI(title="Proun API", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(routes_sources.router, prefix="/api")
 app.include_router(routes_render.router, prefix="/api")
 app.include_router(routes_recolor.router, prefix="/api")

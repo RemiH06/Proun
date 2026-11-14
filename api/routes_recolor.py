@@ -17,13 +17,13 @@ from PIL import Image
 
 import recolorear
 from proun import loading
-from proun import spec as spec_module
 from proun.errors import SpecError
 from proun.ops import resize as resize_op
 from proun.ops import rotate
 from proun.ops.recolor import COLORMAPS
 
 from .paths import resolve_sources_path
+from .routes_render import dimensiones
 from .schemas import RecolorAllRequest, RecolorGeometry, RecolorRequest
 
 router = APIRouter()
@@ -48,7 +48,7 @@ def _preparar(body: RecolorGeometry, ruta: str) -> Image.Image:
     if body.angle or body.flip_h or body.flip_v:
         imagen = rotate.apply(imagen, body.angle, _flip_mode(body.flip_h, body.flip_v))
     if body.resolution:
-        ancho, alto = spec_module.parse_resolutions([body.resolution])[0]
+        ancho, alto = dimensiones(body.resolution)
         imagen = resize_op.apply(imagen, {"size": [ancho, alto], "mode": "fill"}, (ancho, alto))
     return imagen
 

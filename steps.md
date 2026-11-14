@@ -26,18 +26,46 @@ Commit sugerido:
 
 ## Pendiente
 
-### A. Hostear landing + GUI en Bakery
-- Pedido: ambos, la landing (que son los docs) y la herramienta GUI, en
-  algo como `proun.remlam.dev` con los docs en `/docs`.
-- Decisión abierta: el GUI hoy lee y escribe carpetas del disco
-  (`fuentes/`, `wallpapers/`) sin auth. Publicarlo abierto es lo que se
-  había movido a v3.0 (subida de imágenes, auth, almacenamiento, cuotas).
-  Opciones: detrás de Tailscale (sin exponer), o público con auth y
-  subida real. Preguntar a Remi antes de construir.
-- Skills: `hosteo`, `ciberseguridad` (antes de exponer nada),
-  `port-registry` (8030 API, 5183 frontend), `bakery`, `hardware`.
-- Al final: revisar enlaces, agregar canonical y `og:` (con
-  `images/obras/penrose-1600.webp`) según la URL definitiva.
+### A. Hostear landing + GUI en Bakery (decidido 2026-11-14)
+- **Decisión de Remi:** GUI público en `proun.remlam.dev` detrás de
+  Cloudflare Access (lista de correos, como Tabularium); `/docs` (landing)
+  abierto con una app de Access aparte en modo Bypass para esa ruta. Corre
+  en **Pixilate** (WSL), por el túnel de `29.Bakery/publicacion/` (red del
+  host, destino `http://localhost:<puerto>` configurado en el panel).
+  Consecuencia aceptada: la landing también se cae cuando Pixilate se
+  apaga o reinicia. Subida de imágenes: opcional, después del despliegue.
+- **Hecho, endurecimiento de la API (sin commit):**
+  - `api/paths.py`: toda ruta del cliente (carpeta, `src` de capa, `font`
+    de texto, `output`, wallpaper a recolorear, miniatura) tiene que caer
+    en `fuentes/` o `wallpapers/`, o en las de `PROUN_RAICES`
+    (`os.pathsep`). Antes la API leía cualquier imagen del disco y
+    escribía PNG junto a cualquier ruta. Ojo en local: otra carpeta
+    necesita `PROUN_RAICES`.
+  - `api/main.py`: sin Swagger/ReDoc/OpenAPI (chocaba con `/docs`).
+  - `routes_render.LADO_MAXIMO = 4096` en preview, export, spec y
+    recolor; miniaturas de 16 a 512 px.
+  - 12 pruebas nuevas en `tests/test_api.py`; 973 en verde.
+  - Commit sugerido: `fix(api): encierra rutas del cliente, quita Swagger y topa la resolución`
+- **Siguiente:**
+  1. FastAPI sirve `frontend/dist` en `/` y `docs/` en `/docs`
+     (`StaticFiles`, sin Caddy), con cabeceras `X-Content-Type-Options`,
+     `frame-ancestors`; HSTS desde Cloudflare.
+  2. Dockerfile + compose con versión fija, sin `--reload`, usuario no
+     root, `fuentes/` de solo lectura y `wallpapers/` en volumen con
+     nombre, `127.0.0.1:<puerto>` en el WSL. Registrar el puerto con
+     `port-registry`.
+  3. Checklist de `ciberseguridad` completo: `pip-audit`, `npm audit
+     --omit=dev`, auditoría de repo completo por subagente. Pendientes de
+     riesgo bajo detrás de Access: `mosaic.grid` y `recolor.smooth` sin
+     tope (CPU).
+  4. Copiar `fuentes/` (220 MB) a Pixilate (`bakery`), levantar sin
+     publicar y probar por túnel SSH.
+  5. Remi en el panel: hostname en el túnel, app de Access en
+     `proun.remlam.dev` y app Bypass en `proun.remlam.dev/docs`.
+  6. Verificar desde datos móviles: `/docs` abre sin login, `/` y `/api/*`
+     piden login. Anotar en `29.Bakery/steps.md`.
+  7. Canonical y `og:` (con `images/obras/penrose-1600.webp`) en la
+     landing, `launch-checklist`.
 
 ### B. Ideas de retro-art-studio (solo inspiración: sin licencia clara)
 - Halftone CMYK con ángulo de trama por tinta (ellos no aplican ángulos y
