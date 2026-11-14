@@ -31,11 +31,16 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from ..errors import SpecError
+from ..geometry import tope
 
 FILL = 255
 CONTORNO = 90
 SUPERSAMPLE = 4
 WORKING_SIZE = 200  # alto de línea de trabajo en px, antes de recortar al bbox real
+# Tope del raster de trabajo (escala de grises, 1 byte por píxel, a 4x): un
+# texto muy largo sin `wrap` o un `line_spacing` enorme pedían gigas. 64 MP
+# dejan unas 80 letras por línea, o decenas de líneas con `wrap`.
+MAX_PIXELES_RASTER = 64_000_000
 
 FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 DEFAULT_FONTS = {
@@ -118,6 +123,8 @@ def _draw(font, lineas, align, espaciado, ancho_stroke) -> Image.Image:
     ancho_total = max((c[2] - c[0] for c in cajas), default=1)
     alto_total = alto_linea * len(lineas)
 
+    tope((max(1, ancho_total), max(1, alto_total)),
+         "el texto (largo, líneas o line_spacing)", MAX_PIXELES_RASTER)
     im = Image.new("L", (max(1, ancho_total), max(1, alto_total)), 0)
     draw = ImageDraw.Draw(im)
     for i, (linea, caja) in enumerate(zip(lineas, cajas)):

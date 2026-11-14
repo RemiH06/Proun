@@ -48,3 +48,20 @@ def resolve_sources_path(path: str) -> str:
     if not any(real.is_relative_to(raiz) for raiz in raices()):
         raise SpecError(f"la ruta está fuera de las carpetas permitidas: {path}")
     return str(ruta)
+
+
+def revisar_cuota(destino) -> None:
+    """Rechaza escribir si la carpeta permitida que contiene a `destino` ya
+    ocupa más de `PROUN_CUOTA_MB`. Sin la variable no hay cuota (uso local).
+    No se usa el espacio libre del disco: dentro del WSL de Pixilate, `df`
+    reporta el disco virtual entero, no lo que de verdad queda en C:."""
+    cuota = os.environ.get("PROUN_CUOTA_MB")
+    if not cuota:
+        return
+    real = Path(destino).resolve()
+    raiz = next((r for r in raices() if real.is_relative_to(r)), None)
+    if raiz is None:
+        raise SpecError(f"la ruta está fuera de las carpetas permitidas: {destino}")
+    usado = sum(f.stat().st_size for f in raiz.rglob("*") if f.is_file())
+    if usado > int(cuota) * 1024 * 1024:
+        raise SpecError(f"la carpeta de salida ya ocupa más de {cuota} MB: borra wallpapers viejos")

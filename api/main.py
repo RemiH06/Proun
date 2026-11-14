@@ -1,19 +1,24 @@
-"""App FastAPI de Proun: envuelve proun.spec/proun.compose para una GUI local.
+"""App FastAPI de Proun: envuelve proun.spec/proun.compose para el GUI.
 
-Local, un solo usuario: sin auth, sin CORS (el frontend de Vite llega acá por
-proxy, no por origen cruzado). Corre con `uvicorn api.main:app --reload`.
+Sin auth propia y sin CORS. En desarrollo, el frontend de Vite llega acá por
+proxy (`uvicorn api.main:app --reload --port 8030`). Publicado, esta misma
+app sirve todo desde un solo origen: la API en `/api`, la landing en
+`/docs` y el build del frontend en `/`; la identidad la pone Cloudflare
+Access delante (ver `steps.md`), no esta app.
 """
 
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from proun import layout
 from proun.errors import SpecError
 from proun.ops import blend, iso, recolor, shapes
 
 from . import routes_recolor, routes_render, routes_sources
+from .paths import PROJECT_ROOT
 
 # Sin Swagger/ReDoc/OpenAPI: `/docs` es la landing en el sitio publicado, y
 # el esquema de la API no tiene por qué quedar a la vista de quien entre.
@@ -44,3 +49,53 @@ async def _spec_error_handler(request: Request, exc: SpecError) -> JSONResponse:
     # SourceError es subclase de SpecError: un solo manejador cubre las dos,
     # y el mensaje ya viene en español desde el motor, no se reescribe.
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+# Un spec real del editor pesa unos KB: 1 MB sobra y corta cuerpos gigantes
+# antes de que Pydantic los parsee. Solo mira Content-Length (Cloudflare lo
+# manda); un cuerpo por chunks sin ese encabezado no se frena aquí.
+MAX_CUERPO = 1_000_000
+
+
+@app.middleware("http")
+async def _tope_de_cuerpo(request: Request, call_next):
+    largo = request.headers.get("content-length", "")
+    if largo.isdigit() and int(largo) > MAX_CUERPO:
+        return JSONResponse(status_code=413, content={"detail": "la petición pesa más de 1 MB"})
+    return await call_next(request)
+
+
+# Cabeceras en toda respuesta: `nosniff` para que el navegador no adivine
+# tipos (una imagen tratada como script), y nadie de otro origen puede meter
+# la app en un iframe (clickjacking). HSTS lo pone Cloudflare, que es quien
+# termina el TLS. Sin CSP completa: la landing carga Motion de jsdelivr.
+CABECERAS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Security-Policy": "frame-ancestors 'self'",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+}
+
+
+@app.middleware("http")
+async def _cabeceras(request: Request, call_next):
+    respuesta = await call_next(request)
+    respuesta.headers.update(CABECERAS)
+    return respuesta
+
+
+@app.get("/docs", include_in_schema=False)
+def _docs_con_diagonal() -> RedirectResponse:
+    # La landing usa rutas relativas (`images/...`): sin la diagonal final se
+    # resolverían contra `/`. Redirección relativa, para no armar una URL
+    # `http://` detrás del túnel, que llega en HTTP plano.
+    return RedirectResponse("/docs/", status_code=308)
+
+
+# Montajes al final: `/` atrapa todo lo que no sea una ruta de arriba. El
+# build del frontend solo existe después de `npm run build` (en desarrollo
+# lo sirve Vite), así que se monta solo si está.
+app.mount("/docs", StaticFiles(directory=PROJECT_ROOT / "docs", html=True), name="docs")
+FRONTEND = PROJECT_ROOT / "frontend" / "dist"
+if FRONTEND.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="frontend")

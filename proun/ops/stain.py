@@ -55,9 +55,7 @@ def apply(im: Image.Image, spec, rng=None) -> Image.Image:
         )
 
     scale = _positive(spec.get("scale", 0.35), "stain.scale", top=4)
-    octaves = spec.get("octaves", 3)
-    if isinstance(octaves, bool) or not isinstance(octaves, int) or not 1 <= octaves <= MAX_OCTAVES:
-        raise SpecError(f"stain.octaves debe ser un entero entre 1 y {MAX_OCTAVES}")
+    octaves = _octavas(spec)
     threshold = _unit(spec.get("threshold", 0.0), "stain.threshold")
     edges = _unit(spec.get("edges", 0.0), "stain.edges")
 
@@ -85,13 +83,22 @@ def clouds(size: tuple[int, int], spec, rng) -> Image.Image:
     nada sino de mezclar entre dos tonos.
     """
     mapa = _clouds(size, _positive(spec.get("scale", 0.4), "stain.scale", top=4),
-                   int(spec.get("octaves", 3)), rng)
+                   _octavas(spec), rng)
     umbral = spec.get("threshold", 0)
     if umbral:
         mapa = mapa.point(_knee(_unit(umbral, "stain.threshold")))
     if spec.get("invert", False):
         mapa = ImageChops.invert(mapa)
     return mapa
+
+
+def _octavas(spec) -> int:
+    """Cada octava es una pasada completa de ruido sobre el lienzo: sin este
+    tope, `octaves: 100000` en un fondo o acabado eran horas de CPU."""
+    octaves = spec.get("octaves", 3)
+    if isinstance(octaves, bool) or not isinstance(octaves, int) or not 1 <= octaves <= MAX_OCTAVES:
+        raise SpecError(f"stain.octaves debe ser un entero entre 1 y {MAX_OCTAVES}")
+    return octaves
 
 
 def _clouds(size: tuple[int, int], scale: float, octaves: int, rng) -> Image.Image:

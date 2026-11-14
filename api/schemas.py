@@ -7,7 +7,7 @@ error en español llegan tal cual al cliente (ver `main.py`).
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LayerSpec(BaseModel):
@@ -41,7 +41,9 @@ class LayerSpec(BaseModel):
 
 
 class PreviewRequest(BaseModel):
-    layers: list[LayerSpec]
+    # Tope: cada capa preparada se queda en memoria (y en la caché de
+    # geometría), así que miles de capas tumbaban el contenedor.
+    layers: list[LayerSpec] = Field(max_length=64)
     layout_mode: str = "scatter"
     color: str = "#3ba7ff"
     recolor_mode: str = "duotone"

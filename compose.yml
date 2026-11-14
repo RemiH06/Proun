@@ -1,0 +1,39 @@
+# Proun en el WSL de Pixilate, publicado en proun.remlam.dev por el túnel de
+# 29.Bakery/publicacion/ (red del host, destino http://localhost:8031).
+# Cloudflare Access pide login en todo salvo /docs; esta app no tiene auth
+# propia, así que el puerto solo escucha en loopback.
+#
+# Levantar:   docker compose up -d --build
+# Apagar:     docker compose down   (lo público se apaga desde el túnel)
+# fuentes/ se copia aparte junto a este archivo (no está en git).
+
+services:
+  proun:
+    build: .
+    image: proun:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8031:8030"
+    volumes:
+      - ./fuentes:/app/fuentes:ro
+      - wallpapers:/app/wallpapers
+    environment:
+      PROUN_CUOTA_MB: "5120"  # wallpapers/ no pasa de 5 GB (api/paths.py)
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Un render pesado no debe dejar a Pixilate sin CPU ni memoria.
+    cpus: 2
+    mem_limit: 2g
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8030/api/options')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  wallpapers:

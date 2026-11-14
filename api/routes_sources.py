@@ -57,8 +57,7 @@ def list_sources(path: str = Query(...)) -> dict:
 
 @router.get("/sources/thumbnail")
 def thumbnail(path: str = Query(...), size: int = Query(160, ge=16, le=512)) -> Response:
-    imagen = loading.load(resolve_sources_path(path))
-    imagen.thumbnail((size, size))
+    imagen = loading.thumbnail(resolve_sources_path(path), size)
     buffer = io.BytesIO()
     imagen.save(buffer, format="PNG")
     return Response(content=buffer.getvalue(), media_type="image/png")

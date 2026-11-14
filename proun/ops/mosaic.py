@@ -18,7 +18,7 @@ import math
 from PIL import Image
 
 from ..errors import SpecError
-from ..geometry import pair
+from ..geometry import pair, tope
 from .resize import RESAMPLE
 
 
@@ -48,7 +48,9 @@ def apply(im: Image.Image, spec, canvas: tuple[int, int], rng=None) -> Image.Ima
         filt = RESAMPLE.get(str(spec.get("resample", "lanczos")).lower())
         if filt is None:
             raise SpecError(f"resample debe ser uno de {sorted(RESAMPLE)}")
-        tile = im.resize(pair(spec["tile"], im.size, name="mosaic.tile"), filt)
+        medida = pair(spec["tile"], im.size, name="mosaic.tile")
+        tope(medida, "mosaic.tile")
+        tile = im.resize(medida, filt)
 
     mirror = bool(spec.get("mirror", False))
     offset = _offset(spec.get("offset"))
@@ -67,6 +69,7 @@ def apply(im: Image.Image, spec, canvas: tuple[int, int], rng=None) -> Image.Ima
     if cols * rows > 20_000:
         raise SpecError(f"el mosaico pediría {cols * rows} piezas, revisa el tamaño de la pieza")
 
+    tope((tile.width * cols, tile.height * rows), "el mosaico")
     sheet = Image.new("RGBA", (tile.width * cols, tile.height * rows), (0, 0, 0, 0))
     for row in range(rows):
         for col in range(cols):

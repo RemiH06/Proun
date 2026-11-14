@@ -46,25 +46,44 @@ Commit sugerido:
     recolor; miniaturas de 16 a 512 px.
   - 12 pruebas nuevas en `tests/test_api.py`; 973 en verde.
   - Commit sugerido: `fix(api): encierra rutas del cliente, quita Swagger y topa la resolución`
+- **Hecho, despliegue (sin commit):**
+  - `api/main.py` sirve `docs/` en `/docs/` (`/docs` redirige con 308
+    relativo) y `frontend/dist` en `/` si existe; cabeceras `nosniff`,
+    `X-Frame-Options`, `frame-ancestors`, `Referrer-Policy`. Pruebas en
+    `tests/test_api.py::SitioPublicado`.
+  - `Dockerfile` (dos etapas, `node:24.22.1-alpine` y
+    `python:3.13.17-slim-trixie`, usuario sin privilegios),
+    `.dockerignore` en lista blanca, `compose.yml` (`127.0.0.1:8031`,
+    `read_only`, `cap_drop`, 2 CPU, 2 GB, `fuentes/` de solo lectura,
+    volumen `wallpapers`). Puerto 8031 en `PORTS.md` de SkillShot.
+  - `pip-audit`: Pillow 10.4.0 tenía 69 CVE; con 13.0.0 ninguno y las 979
+    pruebas pasan igual. `requirements.txt` pide `>=13.0`. En Aerilate
+    sigue la 10.4: `pip install -U "Pillow>=13"`.
+  - `npm audit --omit=dev`: 0.
 - **Siguiente:**
-  1. FastAPI sirve `frontend/dist` en `/` y `docs/` en `/docs`
-     (`StaticFiles`, sin Caddy), con cabeceras `X-Content-Type-Options`,
-     `frame-ancestors`; HSTS desde Cloudflare.
-  2. Dockerfile + compose con versión fija, sin `--reload`, usuario no
-     root, `fuentes/` de solo lectura y `wallpapers/` en volumen con
-     nombre, `127.0.0.1:<puerto>` en el WSL. Registrar el puerto con
-     `port-registry`.
-  3. Checklist de `ciberseguridad` completo: `pip-audit`, `npm audit
-     --omit=dev`, auditoría de repo completo por subagente. Pendientes de
-     riesgo bajo detrás de Access: `mosaic.grid` y `recolor.smooth` sin
-     tope (CPU).
-  4. Copiar `fuentes/` (220 MB) a Pixilate (`bakery`), levantar sin
-     publicar y probar por túnel SSH.
-  5. Remi en el panel: hostname en el túnel, app de Access en
-     `proun.remlam.dev` y app Bypass en `proun.remlam.dev/docs`.
-  6. Verificar desde datos móviles: `/docs` abre sin login, `/` y `/api/*`
-     piden login. Anotar en `29.Bakery/steps.md`.
-  7. Canonical y `og:` (con `images/obras/penrose-1600.webp`) en la
+  1. Hecho: auditoría de repo completo. Arreglados A1 a A4 (caché con
+     tope, miniatura sin caché, `src` solo archivo, topes de píxeles,
+     octavas en `clouds`, 64 capas, cuerpo de 1 MB), M3 (cuota), B1 (sufijo
+     saneado), B5 (`tmpfs` y `pids_limit`), B6 (`obras.py` fuera de la
+     imagen), `uvicorn` sin `[standard]`. Ver `CLAUDE.md`. Pendientes:
+     - M2: validar el JWT de Access en el origen (defensa en profundidad
+       si el túnel o Access se configuran mal). Hacerlo cuando exista la
+       app de Access (hace falta su AUD y el team domain).
+     - M1: sin semáforo de concurrencia: `cpus: 2` ya topa el CPU y los
+       topes por operación acotan cada petición.
+     - B2 (rutas `/app/...` en respuestas) y B4 (lock con hashes, digest
+       de imágenes): bajos, sin hacer.
+     - B3: `steps.md` está versionado pese al `.gitignore` (revela el
+       esquema de despliegue): `git rm --cached steps.md`.
+  2. Remi: commit y push. En Pixilate (WSL): clonar en `~/srv/proun`,
+     copiar `fuentes/` (220 MB), `docker compose up -d --build`, probar
+     por túnel SSH (`ssh -N -L 8031:localhost:8031 pixilate`).
+  3. Remi en el panel: hostname `proun.remlam.dev` → `http://localhost:8031`
+     en el túnel, app de Access en `proun.remlam.dev` y app Bypass en
+     `proun.remlam.dev/docs`.
+  4. Verificar desde datos móviles: `/docs/` abre sin login, `/` y
+     `/api/*` piden login. Anotar en `29.Bakery/steps.md`.
+  5. Canonical y `og:` (con `images/obras/penrose-1600.webp`) en la
      landing, `launch-checklist`.
 
 ### B. Ideas de retro-art-studio (solo inspiración: sin licencia clara)

@@ -24,6 +24,19 @@ ANCHORS = {
 }
 
 
+# Tope de píxeles de una imagen intermedia (resize, hoja de mosaico): 40 MP
+# en RGBA son 160 MB. Alcanza con margen para el mosaico 2x2 de una foto de
+# 8 MP de `recetas/tinta.py` (32 MP), y frena un `size` o `tile` gigante que
+# pediría decenas de GB de una sola vez.
+MAX_PIXELES = 40_000_000
+
+
+def tope(size: tuple[int, int], name: str, maximo: int = MAX_PIXELES) -> None:
+    ancho, alto = size
+    if ancho * alto > maximo:
+        raise SpecError(f"{name} pediría {ancho}x{alto} px, más de {maximo:,} en total")
+
+
 def measure(value, reference: int, *, name: str = "medida", minimum: int | None = 1) -> int:
     """Convierte un valor px/fracción a píxeles enteros contra `reference`.
 

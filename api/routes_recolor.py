@@ -22,8 +22,8 @@ from proun.ops import resize as resize_op
 from proun.ops import rotate
 from proun.ops.recolor import COLORMAPS
 
-from .paths import resolve_sources_path
-from .routes_render import dimensiones
+from .paths import resolve_sources_path, revisar_cuota
+from .routes_render import _slug, dimensiones
 from .schemas import RecolorAllRequest, RecolorGeometry, RecolorRequest
 
 router = APIRouter()
@@ -72,7 +72,10 @@ def preview(body: RecolorRequest) -> Response:
 def export(body: RecolorRequest) -> Response:
     imagen = _repintar(body)
     origen = Path(resolve_sources_path(body.path))
-    sufijo = recolorear.sufijo(body.mode, body.name, body.stops, body.colors)
+    revisar_cuota(origen)
+    # Saneado: en duotone/tint/screen/hue el sufijo lleva `name` tal cual
+    # llegó, y no debe poder elegir un nombre arbitrario en la carpeta.
+    sufijo = _slug(recolorear.sufijo(body.mode, body.name, body.stops, body.colors))
     destino = origen.with_stem(f"{origen.stem}_{sufijo}")
     imagen.convert("RGB").save(destino)
     return Response(
@@ -88,6 +91,7 @@ def export_all(body: RecolorAllRequest) -> dict:
     junto al original, en su misma carpeta: para tener listas todas las
     variantes de un wallpaper sin exportarlas una por una."""
     ruta = resolve_sources_path(body.path)
+    revisar_cuota(ruta)
     imagen = _preparar(body, ruta)
     origen = Path(ruta)
 

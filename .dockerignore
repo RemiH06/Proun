@@ -1,0 +1,13 @@
+# Lista blanca: solo entra lo que la imagen usa. Así fuentes/, wallpapers/,
+# notas locales o cualquier secreto futuro no se cuelan al contexto.
+*
+!proun/
+!api/
+!recolorear.py
+!docs/
+!frontend/
+frontend/node_modules
+frontend/dist
+**/__pycache__
+# Genera las obras de la landing con el motor; servido en /docs/ sobraría.
+docs/obras.py

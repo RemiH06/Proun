@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import json
 import re
+from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import Response
@@ -18,7 +19,7 @@ from proun import spec as spec_module
 from proun.errors import SpecError
 
 from .cache import cache, geometry_hash
-from .paths import resolve_sources_path
+from .paths import resolve_sources_path, revisar_cuota
 from .schemas import ExportRequest, PreviewRequest
 
 router = APIRouter()
@@ -70,7 +71,12 @@ def _rutas_permitidas(capa: dict) -> dict:
     """Las dos rutas de archivo que puede traer una capa (`src` y la `font`
     de un texto) pasan por `resolve_sources_path`: ver `api/paths.py`."""
     if "src" in capa:
-        capa = {**capa, "src": resolve_sources_path(capa["src"])}
+        ruta = resolve_sources_path(capa["src"])
+        # El motor también acepta carpetas y patrones en `src`, pero desde
+        # la API eso es decodificar cientos de fotos en una sola petición.
+        if not Path(ruta).is_file():
+            raise SpecError(f"src debe ser un archivo de imagen que exista: {capa['src']}")
+        capa = {**capa, "src": ruta}
     texto = capa.get("text")
     if isinstance(texto, dict) and "font" in texto:
         capa = {**capa, "text": {**texto, "font": resolve_sources_path(str(texto["font"]))}}
@@ -173,6 +179,7 @@ def _wallpaper_paths(body: ExportRequest, built) -> tuple:
 def export(body: ExportRequest) -> Response:
     built, image = _render(body, body.resolution, body.format, body.output)
     carpeta, base = _wallpaper_paths(body, built)
+    revisar_cuota(carpeta)
     path = carpeta / f"{base}.{built.fmt}"
     compose.save(image, path, built.fmt, built.quality, built.optimize)
     spec_data = _spec_dict(body, body.resolution, body.format, body.output)

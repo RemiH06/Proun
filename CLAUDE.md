@@ -377,6 +377,31 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   guarda sin comprimir junto al original, en su misma carpeta, en vez de
   exportarlos uno por uno a mano. No arma un zip, ver `RecolorAllRequest`
   en `api/schemas.py`.
+- **Publicado en `proun.remlam.dev`** (decidido 2026-11-14): GUI detrás
+  de Cloudflare Access (lista de correos), landing abierta en `/docs/` con
+  una app de Access en Bypass para esa ruta. Corre en Pixilate (WSL) con
+  `compose.yml`/`Dockerfile` del repo, en `127.0.0.1:8031`, por el túnel
+  de `29.Bakery/publicacion/`. La app no tiene auth propia: Access la pone.
+  Una sola app sirve todo desde el mismo origen (`api/main.py`): la API en
+  `/api`, `docs/` en `/docs/` y `frontend/dist` en `/` (si existe). Por
+  eso Swagger está apagado. Lo que sostiene publicarlo:
+  - **Carpetas permitidas** (`api/paths.py`): toda ruta del cliente (`src`,
+    `font` de texto, `output`, wallpaper a recolorear, carpeta, miniatura)
+    cae en `fuentes/` o `wallpapers/`, o en `PROUN_RAICES`. En local, una
+    carpeta fuera de esas necesita la variable. `src` desde la API tiene
+    que ser un archivo, no carpeta ni patrón.
+  - **Topes**: lado del lienzo 4096 (`routes_render.LADO_MAXIMO`), 64 capas,
+    cuerpo de 1 MB, 40 MP por imagen intermedia de resize/mosaico
+    (`geometry.tope`), 64 MP para el raster de texto, octavas de 1 a 6
+    también en `stain.clouds`, caché de imágenes decodificadas con tope
+    (`loading.CACHE_BYTES`, 512 MB, `PROUN_CACHE_MB`), cuota de escritura
+    `PROUN_CUOTA_MB` (5 GB en el compose, sin cuota en local). No sirve
+    `shutil.disk_usage` para esto: el `df` del WSL ve el disco virtual, no
+    lo libre en C:.
+  - Pillow 13 como mínimo: la 10.4 tenía 69 CVE (`pip-audit`).
+  - Pruebas: `tests/test_topes.py` y las clases `CarpetasPermitidas`,
+    `TopesDeLaApi` y `SitioPublicado` de `tests/test_api.py`.
+
 Esta v2.0 local ya cubre todo el editor visual de specs. Movido a v3.0 (hosteada, no ahora): subida/almacenamiento real de imágenes
 (sigue siendo una carpeta local en disco por ahora, decidido a propósito:
 un upload de verdad implica una historia de storage que no tiene sentido

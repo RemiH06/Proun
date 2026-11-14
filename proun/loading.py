@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import glob
+import os
+from collections import OrderedDict
 from pathlib import Path
 
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -11,7 +13,13 @@ from .errors import SourceError
 
 EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff", ".avif"}
 
-_cache: dict[Path, Image.Image] = {}
+# Imágenes ya decodificadas (RGBA, 4 bytes por píxel), las de uso más
+# reciente al final. Con tope de memoria: sin él, recorrer las 165 fotos de
+# fuentes/ dejaba 3.7 GB retenidos para siempre en el proceso de la API. En
+# un lote de la CLI que reusa pocas fotos entre semillas sigue igual de útil.
+# `PROUN_CACHE_MB` lo ajusta.
+_cache: OrderedDict[Path, Image.Image] = OrderedDict()
+CACHE_BYTES = int(os.environ.get("PROUN_CACHE_MB", "512")) * 1024 * 1024
 
 
 def expand(patterns) -> list[Path]:
@@ -60,7 +68,31 @@ def load(path) -> Image.Image:
         except (UnidentifiedImageError, OSError) as exc:
             raise SourceError(f"no se pudo leer la imagen {path}: {exc}") from exc
         _cache[key] = cached
+        while sum(_bytes(i) for i in _cache.values()) > CACHE_BYTES and len(_cache) > 1:
+            _cache.popitem(last=False)
+    _cache.move_to_end(key)
     return cached.copy()
+
+
+def _bytes(im: Image.Image) -> int:
+    return im.width * im.height * 4
+
+
+def thumbnail(path, side: int) -> Image.Image:
+    """Miniatura sin pasar por la caché de `load`: una lista de cientos de
+    fotos no debe decodificarlas todas a tamaño completo. `draft` deja que
+    el decodificador de JPEG reduzca al leer, mucho más barato."""
+    key = Path(path).expanduser()
+    if not key.is_file():
+        raise SourceError(f"no existe la imagen: {path}")
+    try:
+        with Image.open(key) as im:
+            im.draft("RGB", (side, side))
+            mini = ImageOps.exif_transpose(im)
+            mini.thumbnail((side, side))
+            return mini.convert("RGBA")
+    except (UnidentifiedImageError, OSError) as exc:
+        raise SourceError(f"no se pudo leer la imagen {path}: {exc}") from exc
 
 
 def peek_size(path) -> tuple[int, int]:

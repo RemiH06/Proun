@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from api.cache import cache
-from api.main import app
+from api.main import FRONTEND, app
 from api.paths import PROJECT_ROOT, resolve_sources_path
 from api.routes_render import _build_spec, _sin_explosion_de_mosaico
 from api.routes_sources import usadas_en
@@ -189,12 +189,90 @@ class CarpetasPermitidas(unittest.TestCase):
                 resolve_sources_path("api")
 
 
-class SinDocumentacionDeLaApi(unittest.TestCase):
-    """`/docs` es la landing en el sitio publicado: FastAPI no lo reclama."""
+class TopesDeLaApi(unittest.TestCase):
+    """Lo que la auditoría del 2026-11-14 encontró que una sola petición
+    podía pedir: ver api/schemas.py, api/main.py y api/paths.py."""
+
+    def test_src_carpeta_no_se_expande(self):
+        resp = client.post("/api/preview", json=cuerpo(layers=[{"src": str(FUENTES)}]))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("archivo de imagen", resp.json()["detail"])
+
+    def test_src_patron_no_se_expande(self):
+        resp = client.post("/api/preview", json=cuerpo(layers=[{"src": str(FUENTES / "*.png")}]))
+        self.assertEqual(resp.status_code, 400)
+
+    def test_mas_de_64_capas(self):
+        resp = client.post("/api/preview", json=cuerpo(layers=[{"shape": "rect"}] * 65))
+        self.assertEqual(resp.status_code, 422)
+
+    def test_cuerpo_de_mas_de_1_mb(self):
+        resp = client.post("/api/preview", content=b"{" + b" " * 1_000_001 + b"}",
+                           headers={"content-type": "application/json"})
+        self.assertEqual(resp.status_code, 413)
+
+    def test_cuota_llena_no_escribe(self):
+        salida = RAIZ / "con_cuota"
+        with patch.dict(os.environ, {"PROUN_CUOTA_MB": "0"}):
+            resp = client.post("/api/export", json=cuerpo(resolution="320x200", output=str(salida)))
+            self.assertEqual(resp.status_code, 400)
+            self.assertIn("ocupa más de", resp.json()["detail"])
+            recolor = client.post("/api/recolor/export-all", json={"path": str(WALLPAPER)})
+            self.assertEqual(recolor.status_code, 400)
+        self.assertFalse(salida.exists())
+
+    def test_sin_cuota_escribe_como_siempre(self):
+        with patch.dict(os.environ, {"PROUN_CUOTA_MB": ""}):
+            resp = client.post("/api/export", json=cuerpo(
+                resolution="320x200", output=str(RAIZ / "sin_cuota")))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_sufijo_de_recolor_saneado(self):
+        origen = RAIZ / "sufijo.png"
+        Image.linear_gradient("L").resize((32, 32)).convert("RGB").save(origen)
+        resp = client.post("/api/recolor/export", json={
+            "path": str(origen), "mode": "duotone", "name": "Mi Nombre!.."})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(Path(resp.headers["x-export-path"]).name, "sufijo_mi_nombre.png")
+
+
+class SitioPublicado(unittest.TestCase):
+    """La misma app sirve landing, frontend y API desde un solo origen: ver
+    el final de api/main.py."""
 
     def test_swagger_redoc_y_openapi_apagados(self):
-        for ruta in ("/docs", "/redoc", "/openapi.json"):
+        for ruta in ("/redoc", "/openapi.json"):
             self.assertEqual(client.get(ruta).status_code, 404, ruta)
+        self.assertNotIn("swagger", client.get("/docs/").text.lower())
+
+    def test_docs_sin_diagonal_redirige_de_forma_relativa(self):
+        resp = client.get("/docs", follow_redirects=False)
+        self.assertEqual(resp.status_code, 308)
+        self.assertEqual(resp.headers["location"], "/docs/")
+
+    def test_docs_sirve_la_landing(self):
+        resp = client.get("/docs/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.text, (PROJECT_ROOT / "docs" / "index.html").read_text(encoding="utf-8"))
+
+    def test_docs_no_deja_salir_de_su_carpeta(self):
+        self.assertEqual(client.get("/docs/..%2Fapi%2Fmain.py").status_code, 404)
+
+    def test_cabeceras_de_seguridad_en_api_y_estaticos(self):
+        for ruta in ("/api/options", "/docs/"):
+            cabeceras = client.get(ruta).headers
+            self.assertEqual(cabeceras["x-content-type-options"], "nosniff", ruta)
+            self.assertEqual(cabeceras["content-security-policy"], "frame-ancestors 'self'", ruta)
+
+    def test_la_api_gana_sobre_el_frontend(self):
+        self.assertEqual(client.get("/api/options").headers["content-type"], "application/json")
+
+    def test_raiz_sirve_el_build_del_frontend(self):
+        if not FRONTEND.is_dir():
+            self.skipTest("sin frontend/dist (npm run build)")
+        resp = client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.text, (FRONTEND / "index.html").read_text(encoding="utf-8"))
 
 
 class TopeDeResolucion(unittest.TestCase):

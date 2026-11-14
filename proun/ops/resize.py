@@ -22,7 +22,7 @@ from __future__ import annotations
 from PIL import Image
 
 from ..errors import SpecError
-from ..geometry import anchor_factors, measure, pair, place_box
+from ..geometry import anchor_factors, measure, pair, place_box, tope
 
 RESAMPLE = {
     "nearest": Image.Resampling.NEAREST,
@@ -82,6 +82,7 @@ def apply(im: Image.Image, spec, canvas: tuple[int, int], rng=None) -> Image.Ima
         target = (max(1, round(im.width * factor)), max(1, round(im.height * factor)))
         mode = "stretch"
 
+    tope(target, "resize")
     if target == im.size:
         return im
     if mode == "stretch":
@@ -94,7 +95,10 @@ def apply(im: Image.Image, spec, canvas: tuple[int, int], rng=None) -> Image.Ima
             (max(1, round(im.width * factor)), max(1, round(im.height * factor))), filt
         )
     factor = max(target[0] / im.width, target[1] / im.height)
-    grown = im.resize((max(target[0], round(im.width * factor)),
-                       max(target[1], round(im.height * factor))), filt)
+    # Cubrir agranda un lado más allá del destino: con una imagen muy
+    # alargada, ese intermedio puede ser mucho mayor que el destino mismo.
+    crecida = (max(target[0], round(im.width * factor)), max(target[1], round(im.height * factor)))
+    tope(crecida, "resize")
+    grown = im.resize(crecida, filt)
     x, y = place_box(target, grown.size, anchor_factors(spec.get("anchor", "center"), rng))
     return grown.crop((x, y, x + target[0], y + target[1]))
