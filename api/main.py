@@ -1,23 +1,25 @@
 """App FastAPI de Proun: envuelve proun.spec/proun.compose para el GUI.
 
-Sin auth propia y sin CORS. En desarrollo, el frontend de Vite llega acá por
-proxy (`uvicorn api.main:app --reload --port 8030`). Publicado, esta misma
-app sirve todo desde un solo origen: la API en `/api`, la landing en
-`/docs` y el build del frontend en `/`; la identidad la pone Cloudflare
-Access delante (ver `steps.md`), no esta app.
+Sin login propio y sin CORS. En desarrollo, el frontend de Vite llega acá
+por proxy (`uvicorn api.main:app --reload --port 8030`). Publicado, esta
+misma app sirve todo desde un solo origen: la API en `/api`, la landing en
+`/docs` y el build del frontend en `/`; el login lo pide Cloudflare Access
+delante, y esta app solo revisa el token que Access le pasa (`access.py`).
 """
 
 from __future__ import annotations
 
+import jwt
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from proun import layout
 from proun.errors import SpecError
 from proun.ops import blend, iso, recolor, shapes
 
-from . import routes_recolor, routes_render, routes_sources
+from . import access, routes_recolor, routes_render, routes_sources
 from .paths import PROJECT_ROOT
 
 # Sin Swagger/ReDoc/OpenAPI: `/docs` es la landing en el sitio publicado, y
@@ -62,6 +64,30 @@ async def _tope_de_cuerpo(request: Request, call_next):
     largo = request.headers.get("content-length", "")
     if largo.isdigit() and int(largo) > MAX_CUERPO:
         return JSONResponse(status_code=413, content={"detail": "la petición pesa más de 1 MB"})
+    return await call_next(request)
+
+
+VERIFICADOR = access.desde_entorno()
+
+
+# Va después del tope de cuerpo y antes de las cabeceras: el último
+# middleware declarado es el de más afuera, así que el token se revisa antes
+# que nada y un 403 también lleva las cabeceras de seguridad.
+@app.middleware("http")
+async def _token_de_access(request: Request, call_next):
+    if VERIFICADOR is None or access.es_publica(request.url.path):
+        return await call_next(request)
+    token = request.headers.get(access.ENCABEZADO)
+    if not token:
+        return JSONResponse(status_code=403, content={"detail": "falta el token de Cloudflare Access"})
+    try:
+        # En un hilo: pedir las llaves a Cloudflare es una llamada de red
+        # bloqueante y no debe frenar las demás peticiones.
+        await run_in_threadpool(VERIFICADOR, token)
+    except jwt.PyJWKClientConnectionError:
+        return JSONResponse(status_code=503, content={"detail": "no se pudieron consultar las llaves de Access"})
+    except (jwt.InvalidTokenError, jwt.PyJWKClientError):
+        return JSONResponse(status_code=403, content={"detail": "token de Cloudflare Access inválido"})
     return await call_next(request)
 
 

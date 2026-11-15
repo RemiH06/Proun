@@ -381,7 +381,13 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
   de Cloudflare Access (lista de correos), landing abierta en `/docs/` con
   una app de Access en Bypass para esa ruta. Corre en Pixilate (WSL) con
   `compose.yml`/`Dockerfile` del repo, en `127.0.0.1:8031`, por el túnel
-  de `29.Bakery/publicacion/`. La app no tiene auth propia: Access la pone.
+  de `29.Bakery/publicacion/`. El login lo pone Access; la app no tiene
+  usuarios propios, pero sí revisa el JWT de Access en cada petición fuera de
+  `/docs` (`api/access.py`, PyJWT con las llaves de
+  `<equipo>/cdn-cgi/access/certs`): firma RS256, AUD, emisor y vencimiento.
+  Se prende con `PROUN_ACCESS_EQUIPO` y `PROUN_ACCESS_AUD` (en `compose.yml`;
+  sin las dos, apagado, que es el modo local; con una sola, no arranca). Por
+  eso el healthcheck del compose pega a `/docs/`, no a la API.
   Una sola app sirve todo desde el mismo origen (`api/main.py`): la API en
   `/api`, `docs/` en `/docs/` y `frontend/dist` en `/` (si existe). Por
   eso Swagger está apagado. Lo que sostiene publicarlo:
@@ -400,7 +406,7 @@ Decidido y construido (MVP local, un solo usuario, sin auth ni hosting):
     lo libre en C:.
   - Pillow 13 como mínimo: la 10.4 tenía 69 CVE (`pip-audit`).
   - Pruebas: `tests/test_topes.py` y las clases `CarpetasPermitidas`,
-    `TopesDeLaApi` y `SitioPublicado` de `tests/test_api.py`.
+    `TopesDeLaApi`, `SitioPublicado` y `TokenDeAccess` de `tests/test_api.py`.
   - **`/docs` público lo sirve un Worker de Cloudflare**, no Pixilate:
     `worker/docs.js` pide cada archivo a GitHub Pages
     (`remih06.github.io/Proun`), reescribe sus redirecciones absolutas a

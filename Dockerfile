@@ -13,6 +13,7 @@ RUN npm run build
 FROM python:3.13.17-slim-trixie
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir Pillow==13.0.0 fastapi==0.142.2 uvicorn==0.30.6 \
+    "pyjwt[crypto]==2.15.1" cryptography==50.0.2 \
     && useradd --create-home --uid 10001 proun
 WORKDIR /app
 COPY proun/ proun/

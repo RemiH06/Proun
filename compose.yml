@@ -1,7 +1,7 @@
 # Proun en el WSL de Pixilate, publicado en proun.remlam.dev por el túnel de
 # 29.Bakery/publicacion/ (red del host, destino http://localhost:8031).
-# Cloudflare Access pide login en todo salvo /docs; esta app no tiene auth
-# propia, así que el puerto solo escucha en loopback.
+# Cloudflare Access pide login en todo salvo /docs, y la app revisa además el
+# token de Access (api/access.py). El puerto solo escucha en loopback.
 #
 # Levantar:   docker compose up -d --build
 # Apagar:     docker compose down   (lo público se apaga desde el túnel)
@@ -19,6 +19,10 @@ services:
       - wallpapers:/app/wallpapers
     environment:
       PROUN_CUOTA_MB: "5120"  # wallpapers/ no pasa de 5 GB (api/paths.py)
+      # Token de Access validado en el origen. No son secretos: el equipo y
+      # el AUD salen en la redirección al login.
+      PROUN_ACCESS_EQUIPO: restless-bird-2e12.cloudflareaccess.com
+      PROUN_ACCESS_AUD: acd4c9cd0e33f65b3b49be5d969de6a4e9fe95038188b1eb1ae988419a9aeae2
     read_only: true
     tmpfs:
       - /tmp:size=64m
@@ -30,7 +34,8 @@ services:
     mem_limit: 2g
     pids_limit: 256
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8030/api/options')"]
+      # /docs/: la API pide el token de Access y este chequeo no lo trae.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8030/docs/')"]
       interval: 30s
       timeout: 5s
       retries: 3

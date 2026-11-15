@@ -5,13 +5,18 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import jwt
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from api import access
+from api import main as api_main
 from api.cache import cache
 from api.main import FRONTEND, app
 from api.paths import PROJECT_ROOT, resolve_sources_path
@@ -253,7 +258,7 @@ class SitioPublicado(unittest.TestCase):
     def test_docs_sirve_la_landing(self):
         resp = client.get("/docs/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.text, (PROJECT_ROOT / "docs" / "index.html").read_text(encoding="utf-8"))
+        self.assertEqual(resp.content, (PROJECT_ROOT / "docs" / "index.html").read_bytes())
 
     def test_docs_no_deja_salir_de_su_carpeta(self):
         self.assertEqual(client.get("/docs/..%2Fapi%2Fmain.py").status_code, 404)
@@ -272,7 +277,90 @@ class SitioPublicado(unittest.TestCase):
             self.skipTest("sin frontend/dist (npm run build)")
         resp = client.get("/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.text, (FRONTEND / "index.html").read_text(encoding="utf-8"))
+        self.assertEqual(resp.content, (FRONTEND / "index.html").read_bytes())
+
+
+class TokenDeAccess(unittest.TestCase):
+    """El origen revisa el JWT de Cloudflare Access (api/access.py). Las
+    llaves salen de un JWKS armado aquí: nada sale a la red."""
+
+    EQUIPO = "equipo.cloudflareaccess.com"
+    AUD = "aud-de-prueba"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.llave = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(cls.llave.public_key()))
+        jwk.update(kid="k1", alg="RS256", use="sig")
+        cls.jwks = {"keys": [jwk]}
+
+    def setUp(self):
+        self.verificador = access.Verificador(self.EQUIPO, self.AUD)
+        self.verificador.claves.fetch_data = lambda: self.jwks
+        parche = patch.object(api_main, "VERIFICADOR", self.verificador)
+        parche.start()
+        self.addCleanup(parche.stop)
+
+    def token(self, llave=None, kid="k1", **cambios):
+        ahora = int(time.time())
+        claims = {"aud": [self.AUD], "iss": f"https://{self.EQUIPO}", "iat": ahora, "exp": ahora + 600,
+                  "email": "alguien@ejemplo.com"}
+        claims.update(cambios)
+        return jwt.encode(claims, llave or self.llave, algorithm="RS256", headers={"kid": kid})
+
+    def pedir(self, ruta="/api/options", token=None):
+        cabeceras = {access.ENCABEZADO: token} if token else {}
+        return client.get(ruta, headers=cabeceras, follow_redirects=False)
+
+    def test_token_valido_pasa(self):
+        self.assertEqual(self.pedir(token=self.token()).status_code, 200)
+
+    def test_sin_token_da_403_con_cabeceras_de_seguridad(self):
+        resp = self.pedir()
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.headers["x-content-type-options"], "nosniff")
+
+    def test_rechaza_tokens_que_no_son_de_esta_app(self):
+        otra = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        malos = {
+            "otro aud": self.token(aud=["otra-app"]),
+            "otro emisor": self.token(iss="https://otro.cloudflareaccess.com"),
+            "vencido": self.token(exp=int(time.time()) - 60),
+            "sin exp": jwt.encode({"aud": [self.AUD], "iss": f"https://{self.EQUIPO}", "iat": int(time.time())},
+                                  self.llave, algorithm="RS256", headers={"kid": "k1"}),
+            "firmado con otra llave": self.token(llave=otra),
+            "kid desconocido": self.token(kid="k2"),
+            "HS256 en vez de RS256": jwt.encode(
+                {"aud": [self.AUD], "iss": f"https://{self.EQUIPO}"}, "s" * 32, algorithm="HS256",
+                headers={"kid": "k1"}),
+            "basura": "no.es.jwt",
+        }
+        for caso, token in malos.items():
+            self.assertEqual(self.pedir(token=token).status_code, 403, caso)
+
+    def test_todo_salvo_docs_pide_token(self):
+        for ruta in ("/", "/api/sources/used", "/DOCS/", "/docsx"):
+            self.assertEqual(self.pedir(ruta).status_code, 403, ruta)
+
+    def test_docs_queda_abierta(self):
+        self.assertEqual(self.pedir("/docs/").status_code, 200)
+        self.assertEqual(self.pedir("/docs").status_code, 308)
+
+    def test_sin_red_para_las_llaves_da_503(self):
+        def sin_red():
+            raise jwt.PyJWKClientConnectionError("sin red")
+
+        self.verificador.claves.fetch_data = sin_red
+        self.assertEqual(self.pedir(token=self.token()).status_code, 503)
+
+    def test_configuracion_desde_el_entorno(self):
+        with patch.dict(os.environ, {"PROUN_ACCESS_EQUIPO": "", "PROUN_ACCESS_AUD": ""}):
+            self.assertIsNone(access.desde_entorno())
+        with patch.dict(os.environ, {"PROUN_ACCESS_EQUIPO": self.EQUIPO, "PROUN_ACCESS_AUD": ""}):
+            with self.assertRaises(RuntimeError):
+                access.desde_entorno()
+        with patch.dict(os.environ, {"PROUN_ACCESS_EQUIPO": self.EQUIPO, "PROUN_ACCESS_AUD": self.AUD}):
+            self.assertEqual(access.desde_entorno().emisor, f"https://{self.EQUIPO}")
 
 
 class TopeDeResolucion(unittest.TestCase):
